@@ -30,10 +30,12 @@ import type { FaceMood } from './AgentFace';
  * wifi during a demo.
  */
 
+// The page's two colours, and only those: a white head with dark-blue features
+// and rim. Moods read through the expression, not through a colour change.
 const INK = '#0b2545';
-const PAPER = '#eef4ed';
-const SUCCESS = '#3b6064';
-const FAILURE = '#8c2f39';
+const PAPER = '#ffffff';
+const SUCCESS = INK;
+const FAILURE = INK;
 
 /** Head radius and centre in the SVG's own 160x160 space — see AgentFace.tsx. */
 const SVG_R = 58;
