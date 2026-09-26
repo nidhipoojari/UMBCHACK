@@ -7,7 +7,7 @@
 
 ## 1. Summary
 
-Pack is an Android app with a personal AI agent that runs on the phone (Gemma 4 E2B) and **works with no internet**. As a student uses it, the agent builds a private memory of their courses, skills and interests. When another Pack user is nearby, the two agents talk over Bluetooth and quietly check whether the students share interests. If they do, both phones suggest an icebreaker, and the students connect only if both agree. When the phone is online, the app also uses Gemini with Google Search to find UMBC events that fit the student's memory and sends a notification about them. The local agent can also open other apps for the student (Chrome, Calendar, Maps, SMS) with the details filled in.
+Pack is an Android app with a personal AI agent that runs on the phone (Gemma 4 E2B) and **works with no internet**. As a student uses it, the agent builds a private memory of their courses, skills and interests. When another Pack user is nearby, the two agents talk over Bluetooth and quietly check whether the students share interests. If they do, both phones suggest an icebreaker, and the students connect only if both agree. When the phone is online, the app also uses Gemini with Google Search to find UMBC events that fit the student's memory and sends a notification about them. **Last phase (built only after everything else works):** the local agent can open other apps for the student (Chrome, Calendar, Maps, SMS) with the details filled in.
 
 **One-line pitch:** "Your offline campus sidekick that finds your people and your events — even in airplane mode."
 
@@ -20,8 +20,10 @@ Pack is an Android app with a personal AI agent that runs on the phone (Gemma 4 
 | G3 | Both must opt in | Profiles are exchanged only after **both** users tap Connect; chat messages then travel over Bluetooth |
 | G4 | Memory that grows as the app is used | Stating a new interest in chat adds a tag that changes the next match or event ranking |
 | G5 | Proactive event suggestions (online) | With Wi-Fi on, Refresh returns at least 3 real UMBC-area events in structured form and sends a notification for the best match |
-| G6 | Phone actions | "Add X to my calendar" opens the Calendar insert screen pre-filled; "open the event page" opens Chrome to the URL |
-| G7 | Uses the DoIT dataset | Onboarding skill tags and the career card come from the bundled `campus.db` built from the hackUMBC dataset |
+| G6 | Uses the DoIT dataset | Onboarding skill tags and the career card come from the bundled `campus.db` built from the hackUMBC dataset |
+| G7 | Phone actions (**last phase, after the hour-16 checkpoint**) | "Add X to my calendar" opens the Calendar insert screen pre-filled; "open the event page" opens Chrome to the URL |
+
+G1–G6 are the core; the app ships without G7 if time runs out.
 
 **Out of scope:** iOS; accessibility-service UI automation (stretch goal only); multi-hop mesh relay; cloud sync of memory; accounts and login; publishing to the Play Store.
 
@@ -47,8 +49,9 @@ Pack is an Android app with a personal AI agent that runs on the phone (Gemma 4 
 │ AgentCore — routes each request, runs the tool loop                │
 │   ├─ LocalLLM   flutter_gemma → Gemma 4 E2B (fallback Gemma 3 1B)  │
 │   ├─ CloudLLM   Gemini REST (Flash-Lite) + google_search grounding │
-│   └─ Tools      open_url · add_calendar_event · open_maps ·        │
-│                 draft_sms · career_paths · remember                │
+│   └─ Tools      core: remember · career_paths · search_events      │
+│                 last phase: open_url · add_calendar_event ·        │
+│                 open_maps · draft_sms                              │
 │ Memory      sqflite (memory.db): facts, tags, embeddings           │
 │ CampusPack  bundled read-only campus.db (from the DoIT dataset)    │
 │ PeerMesh    nearby_connections, Strategy.P2P_CLUSTER               │
@@ -125,17 +128,24 @@ Retrieval for chat context: embed the user message, take the top 5 `memory_item`
 
 The model emits JSON matching one of these schemas. AgentCore validates it; if the JSON is invalid, it retries once with the error message, then falls back to a plain-text answer.
 
+**Core tools (build first):**
+
 | Tool | Args | Effect |
 |---|---|---|
 | `remember` | `{text, tags[]}` | Insert into `memory_item`; add weight to tags |
+| `career_paths` | `{major?, track?}` | Query `track_outcomes` and `role_skills` → shown as the Career Card |
+| `search_events` | `{}` | Only offered when online; hands off to CloudLLM (§6.4) |
+
+**Phone-action tools (last phase — start only after the hour-16 G1–G6 checkpoint passes):**
+
+| Tool | Args | Effect |
+|---|---|---|
 | `open_url` | `{url}` | `ACTION_VIEW` → Chrome |
 | `add_calendar_event` | `{title, start_iso, end_iso?, location?}` | `Intent.ACTION_INSERT` on `CalendarContract.Events`, pre-filled |
 | `open_maps` | `{query}` | `geo:0,0?q=<query>` intent |
 | `draft_sms` | `{body, to?}` | `ACTION_SENDTO smsto:` — the user presses send themselves |
-| `career_paths` | `{major?, track?}` | Query `track_outcomes` and `role_skills` → shown as the Career Card |
-| `search_events` | `{}` | Only offered when online; hands off to CloudLLM (§6.4) |
 
-Every action tool opens the target app. Nothing is sent or saved without the user confirming in that app.
+Every action tool opens the target app. Nothing is sent or saved without the user confirming in that app. Until this phase is built, the Event detail screen offers only a plain "Open page" link via `url_launcher`.
 
 **System prompt (local):** a short persona ("You are Pack, a UMBC student's offline sidekick"), today's date, the profile, the top tags, the retrieved memories, the tool schemas, and the instruction "Call a tool when an action is requested; call `remember` when the user shares a stable fact or interest."
 
@@ -171,7 +181,7 @@ Reliability: auto-reconnect once on disconnect; a manual "Scan again" button; th
 - Trigger: a `workmanager` periodic task every 3 h (when online), plus a Refresh button on the Events screen.
 - Request: Gemini `generateContent` with the `google_search` tool enabled. Prompt: "Find 5–8 public events at or near UMBC (Baltimore County, MD) in the next 7 days relevant to these interests: {top 8 tags}. Return only JSON: [{title, starts_at_iso, location, url, tags[]}]." Parse the JSON leniently: strip code fences and discard items missing a title or date.
 - Ranking: `score = cosine(embed(title+tags), profile_vector) + 0.2 × tag_overlap_count`, where `profile_vector` is the tag embeddings averaged by weight. Upsert into `event_cache`.
-- Notify for the top 1–2 events with a score above a threshold that haven't been notified yet: "🎉 ML Club lightning talks Thu 6pm — matches your interest in ML." Tapping it opens Event detail, which offers Add to calendar, Open page and Directions (these reuse the tools).
+- Notify for the top 1–2 events with a score above a threshold that haven't been notified yet: "🎉 ML Club lightning talks Thu 6pm — matches your interest in ML." Tapping it opens Event detail with an Open page link (Add to calendar and Directions are added in the last phase, reusing the phone-action tools).
 - Fallback: `assets/events_fallback.json` (checked by hand on Saturday) is used when offline or rate-limited.
 - API key: compile-time `--dart-define=GEMINI_KEY=…`, never committed. (The optional DigitalOcean proxy in §6.6 removes the key from the APK.)
 
@@ -199,7 +209,7 @@ A tiny FastAPI service with `POST /events {tags[]}` that calls Gemini, caches re
 ## 8. Testing
 - **Unit (Dart):** tag hashing and overlap (both sides get the same result), event JSON parsing (fences, missing fields), ranking, tool-call validation.
 - **Python:** `build_campus_pack.py` checks row counts and that the pipe-delimited columns split correctly.
-- **Device checks (manual, on both phones):** G1–G7 as a checklist run at hour 16 and hour 21.
+- **Device checks (manual, on both phones):** G1–G6 as a checklist at hour 16; G1–G7 at hour 21 if the last phase was built.
 - **Two-emulator note:** Nearby does not work between emulators, so all Bluetooth testing needs the two real phones.
 
 ## 9. Team split and timeline
@@ -207,7 +217,7 @@ A tiny FastAPI service with `POST /events {tags[]}` that calls Gemini, caches re
 | Owner | Area |
 |---|---|
 | **P1 – Mesh** | PeerMesh, handshake, Nearby UI, Bluetooth chat |
-| **P2 – Brain** | flutter_gemma setup, AgentCore, tools and intents, chat UI |
+| **P2 – Brain** | flutter_gemma setup, AgentCore, core tools, chat UI; phone-action tools in the last phase |
 | **P3 – Memory & Data** | `build_campus_pack.py`, `campus.db`, memory.db, embeddings, onboarding, Career Card |
 | **P4 – Cloud & Story** | Gemini events, ranking, notifications, workmanager, fallback JSON, Devpost, pitch, video, domain |
 
@@ -216,9 +226,10 @@ A tiny FastAPI service with `POST /events {tags[]}` that calls Gemini, caches re
 | 0–1 | Flutter scaffold in the repo; agree on package versions; each person on their own branch |
 | 1–4 | **Risk spikes:** Gemma replies on phone A (P2); two phones exchange JSON over Nearby (P1); `campus.db` built (P3); Gemini with grounding returns events JSON (P4) |
 | 4–10 | Each component works on its own against stub interfaces |
-| 10–16 | Integration: onboarding → memory → match → icebreaker; chat → tools; events → notification |
-| 16 | Run the G1–G7 checklist; freeze features |
-| 16–21 | Polish UI, fix bugs, stretch goals only if all of G1–G7 pass |
+| 10–16 | Integration: onboarding → memory → match → icebreaker; chat → core tools; events → notification |
+| 16 | Run the G1–G6 checklist; freeze core features |
+| 16–20 | Polish UI and fix bugs on the core |
+| 20–21 | **Last phase:** phone-action tools (G7) — only if G1–G6 are solid; otherwise skip |
 | 21–23 | Record the backup video, write the Devpost page, rehearse the pitch twice |
 | 23–24 | Submit (target 10:00 AM) |
 
@@ -228,8 +239,8 @@ A tiny FastAPI service with `POST /events {tags[]}` that calls Gemini, caches re
 1. "Everything you see runs in airplane mode." Show both phones (airplane mode on, Bluetooth on).
 2. Phone A chat: "What could I do with my Data Science track?" → Career Card from DoIT data (offline).
 3. Hand phone B to the judge. Both phones buzz: "Someone nearby also loves robotics & ML — 'Ask them what they'd build with a Jetson.'" Both tap Connect → Bluetooth chat.
-4. Phone A: "Add Friday's ML meetup at 6 to my calendar and show me how to get to ITE." → Calendar opens pre-filled, then Maps.
-5. Turn Wi-Fi on → Refresh events → Gemini returns real events → notification arrives.
+4. Turn Wi-Fi on → Refresh events → Gemini returns real events → notification arrives.
+5. *(Only if G7 was built)* Phone A: "Add that event to my calendar and show me how to get there." → Calendar opens pre-filled, then Maps.
 6. Close: privacy (hashed tags, double opt-in, memory stays on the phone), impact metrics, tracks.
 
 ## 11. Impact plan (STARS)
@@ -249,7 +260,10 @@ A tiny FastAPI service with `POST /events {tags[]}` that calls Gemini, caches re
 | Model hallucinates event details | Medium | Events come only from grounded Gemini; show the URL; the user confirms in Calendar |
 | Scope creep | High | Hour-16 feature freeze; out-of-scope list in §2 |
 
-## 13. Stretch goals (only after G1–G7 pass)
+## 13. Stretch goals (only after G1–G6 pass)
+
+Priority order after the core: **phone-action tools (G7) come first**, then the items below.
+
 1. Diffie-Hellman PSI for tag matching.
 2. One scripted accessibility-service action (e.g., search inside Chrome).
 3. DigitalOcean events proxy (§6.6).
