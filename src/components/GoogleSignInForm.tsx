@@ -45,17 +45,27 @@ function GoogleMark() {
  * `role` matters. Google tells us nothing about which side of the handshake
  * someone is on, so if the landing page already asked, we carry that answer
  * into the users table when the account is recorded.
+ *
+ * On a bare /signup the pathway is picked in the sign-up form's radio group,
+ * which is a different form from this one. `requireRole` makes the button read
+ * that choice, and refuse to create a role-less account when nothing is picked.
  */
 export function GoogleSignInForm({
   label = 'Continue with Google',
   role,
+  requireRole = false,
 }: {
   label?: string;
   role?: Role;
+  requireRole?: boolean;
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(async (): Promise<AuthFormState> => {
-    const result = await signInWithGoogle(role);
+    const picked = document.querySelector<HTMLInputElement>('input[name="role"]:checked')?.value;
+    const chosen = role ?? (picked === 'applicant' || picked === 'employer' ? picked : undefined);
+    if (requireRole && !chosen) return { error: 'Choose which describes you first.' };
+
+    const result = await signInWithGoogle(chosen);
     if (result.ok) router.push('/');
     return result;
   }, {});

@@ -41,7 +41,7 @@ export default async function SignUpPage({
         <SignUpForm role={chosen} />
 
         {isGoogleConfigured() ? (
-          <GoogleSignInForm label="Sign up with Google" role={chosen} />
+          <GoogleSignInForm label="Sign up with Google" role={chosen} requireRole />
         ) : null}
 
         <p className="muted">
