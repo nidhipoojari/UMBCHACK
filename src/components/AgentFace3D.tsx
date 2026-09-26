@@ -30,10 +30,12 @@ import type { FaceMood } from './AgentFace';
  * wifi during a demo.
  */
 
-const INK = '#0b2545';
-const PAPER = '#eef4ed';
-const SUCCESS = '#3b6064';
-const FAILURE = '#8c2f39';
+// Matched to the dark theme in globals.css: a cool-white head with deep-navy
+// features, and the signal colours from --success / --failure.
+const INK = '#0b1024';
+const PAPER = '#eef1ff';
+const SUCCESS = '#10b981';
+const FAILURE = '#ef4444';
 
 /** Head radius and centre in the SVG's own 160x160 space — see AgentFace.tsx. */
 const SVG_R = 58;

@@ -187,7 +187,7 @@ export default function Home() {
       {/* Screen three: the question, answered. */}
       <section className="why" aria-labelledby="why-h">
         <Reveal className="why__q" onScroll>
-          <h2 id="why-h">Why agentHire?</h2>
+          <h2 id="why-h">Why <span className="grad">agentHire</span>?</h2>
         </Reveal>
         <Reveal className="why__a" onScroll>
           <p>
