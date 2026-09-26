@@ -46,3 +46,6 @@ next-env.d.ts
 
 # firebase
 .firebase/
+
+# local planning docs, not part of the app
+/docs/
