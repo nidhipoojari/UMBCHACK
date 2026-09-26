@@ -5,12 +5,9 @@ import { LenisProvider } from '@/components/LenisProvider';
 
 import './globals.css';
 
-/**
- * Forum everywhere, by design decision. It ships a single weight (400) and no
- * italic, so any bold or italic on the page is SYNTHESIZED by the browser.
- * That is deliberate and only used at display sizes, where it holds up.
- */
-const forum = Forum({ weight: '400', subsets: ['latin'], variable: '--font-display', display: 'swap' });
+/** Forum everywhere. It ships a single weight (400) and no italic, so any bold
+ *  on the page is synthesized by the browser; that is kept to display sizes. */
+const forum = Forum({ weight: '400', subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'Application Workspace',

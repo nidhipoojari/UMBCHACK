@@ -2,20 +2,33 @@
    AGENTHIRE — DESIGN SYSTEM
    One file, no override stacking. See docs/FRONTEND_UIUX_PLAN.txt §5.
 
-   Two base colours, two signal colours, one display face, no radius, no white,
-   no shadows. Separation is whitespace first, a hairline second, a box never.
+   Dark, one face (Forum) for everything. Two signal
+   colours, one indigo-to-cyan accent that only ever marks the thing to look at.
+   Content sits in rounded glass cards; the page itself carries a soft glow.
    =========================================================================== */
 
 :root {
-  --paper: #eef4ed;
-  --ink: #0b2545;
-  --success: #3b6064;
-  --failure: #8c2f39;
+  color-scheme: dark;
 
-  --line: color-mix(in srgb, var(--ink) 12%, transparent);
-  --line-strong: color-mix(in srgb, var(--ink) 24%, transparent);
-  --muted: color-mix(in srgb, var(--ink) 62%, transparent);
+  --paper: #07080d;
+  --ink: #e8ebf5;
+  --success: #34d399;
+  --failure: #f87171;
+
+  --accent: #818cf8;
+  --accent-2: #22d3ee;
+  --accent-grad: linear-gradient(120deg, var(--accent) 0%, var(--accent-2) 100%);
+
+  --line: color-mix(in srgb, var(--ink) 9%, transparent);
+  --line-strong: color-mix(in srgb, var(--ink) 18%, transparent);
+  --muted: color-mix(in srgb, var(--ink) 60%, transparent);
   --wash: color-mix(in srgb, var(--ink) 3.5%, transparent);
+
+  --card: color-mix(in srgb, var(--ink) 3%, transparent);
+  --card-hover: color-mix(in srgb, var(--ink) 5.5%, transparent);
+  --radius: 18px;
+  --glow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+    0 18px 60px -18px color-mix(in srgb, var(--accent) 45%, transparent);
 
   --nav-h: 84px;
   --gutter: 34px;
@@ -30,11 +43,7 @@
      Full-bleed blocks use it to line their contents back up with the column. */
   --page-inset: max(var(--gutter), calc((var(--vw-avail) - 1280px) / 2 + var(--gutter)));
 
-  /* The auth screens' two buttons are rounded, by request. Deliberate local
-     exception to the no-radius rule at the top of this file — it applies to the
-     sign-in and sign-up controls only, which is why it is a token rather than a
-     change to the `*` reset. */
-  --control-radius: 10px;
+  --control-radius: 999px;
 }
 
 html[data-transcript='open'] { --drawer-w: min(420px, calc(100vw - 72px)); }
@@ -60,28 +69,33 @@ body {
   body { transition: none; }
 }
 
-*, *::before, *::after { box-sizing: border-box; border-radius: 0; }
+*, *::before, *::after { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--paper);
+  /* Two soft pools of accent light, fixed so they stay put while content
+     scrolls over them. */
+  background:
+    radial-gradient(60rem 40rem at 15% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    radial-gradient(50rem 36rem at 95% 10%, color-mix(in srgb, var(--accent-2) 10%, transparent), transparent 60%),
+    var(--paper);
+  background-attachment: fixed;
   color: var(--ink);
-  font-family: var(--font-display), Georgia, serif;
-  font-size: 18px;
-  letter-spacing: 0.005em;
+  font-family: var(--font-sans), Georgia, serif;
+  font-size: 17px;
+  letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
 }
 
+::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--ink); }
+
 button { font: inherit; cursor: pointer; }
-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; }
+code { font-family: var(--font-sans), Georgia, serif; font-size: 0.92em; }
 
 main { max-width: 1280px; margin: auto; padding: 0 var(--gutter) 96px; }
 
 /* --- Type --------------------------------------------------------------- */
-/* Forum has one weight and no italic. Every bold or italic below is
-   synthesized, which is why it only appears at display sizes. */
-
-h1, h2, h3 { font-weight: 400; margin: 0; }
+h1, h2, h3 { font-weight: 600; margin: 0; letter-spacing: -0.02em; }
 h1 { font-size: clamp(40px, 6vw, 56px); line-height: 1.04; }
 h2 { font-size: 22px; }
 h3 { font-size: 17px; }
@@ -89,9 +103,19 @@ h3 { font-size: 17px; }
 .eyebrow, small {
   display: block;
   color: var(--muted);
-  font-size: 14px;
-  letter-spacing: 0.18em;
+  font-family: var(--font-sans), Georgia, serif;
+  font-size: 13.5px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+.eyebrow { color: var(--accent); }
+
+/* Gradient ink for the few words that should pull the eye. */
+.grad {
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .muted { color: var(--muted); line-height: 1.65; }
@@ -109,23 +133,44 @@ nav {
   display: flex;
   align-items: center;
   gap: 28px;
-  background: var(--paper);
-  font-size: 17px;
+  font-size: 15px;
 }
-/* Full-bleed paper, and no rule. The backing itself has to stay — the nav is
-   sticky, so without it the page scrolls through the wordmark — but the hairline
-   beneath it is gone: the first section's own top border does that work, and two
-   rules 84px apart read as a seam. */
+/* Full-bleed frosted glass: content blurs as it scrolls under the wordmark. */
 nav::before {
   content: '';
   position: absolute;
   inset: 0 calc(50% - var(--vw-avail) / 2);
-  background: var(--paper);
+  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid var(--line);
   z-index: -1;
 }
-nav strong { margin-right: auto; font-size: 27px; letter-spacing: 0.02em; }
-nav a, nav span { color: var(--ink); font-size: 17px; letter-spacing: 0.02em; text-decoration: none; }
-nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
+nav strong {
+  margin-right: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+nav strong::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--accent-grad);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+nav a, nav span { color: var(--ink); font-size: 15px; text-decoration: none; }
+nav > a {
+  padding: 9px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+nav > a:hover { border-color: var(--accent); background: var(--wash); }
 
 nav button {
   display: flex;
@@ -147,21 +192,22 @@ nav button:hover { border-color: var(--ink); }
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  background: var(--ink);
-  border: 1px solid var(--ink);
-  color: var(--paper);
-  padding: 13px 19px;
-  letter-spacing: 0.03em;
+  background: var(--accent-grad);
+  border: 0;
+  border-radius: 999px;
+  color: #06070c;
+  font-weight: 600;
+  padding: 13px 22px;
   text-decoration: none;
-  transition: background 0.22s ease, border-color 0.22s ease;
+  transition: box-shadow 0.22s ease, filter 0.22s ease;
 }
-.primary:hover { background: var(--success); border-color: var(--success); }
+.primary:hover { box-shadow: var(--glow); filter: brightness(1.08); }
 .primary:active { transform: translateY(1px); }
 
 /* --- Focus: the demo is driven from the keyboard ------------------------ */
 
 a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -204,30 +250,48 @@ main, [id] { scroll-margin-top: 100px; }
   padding: 40px 0 96px;
 }
 
+.opening::before {
+  /* Faint engineering grid behind the hero, fading out toward the edges. */
+  content: '';
+  position: absolute;
+  inset: 0 calc(50% - var(--vw-avail) / 2);
+  z-index: -1;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 20%, transparent 75%);
+  mask-image: radial-gradient(ellipse 60% 55% at 50% 40%, #000 20%, transparent 75%);
+  pointer-events: none;
+}
+
 .opening h1 {
-  font-size: clamp(76px, 17vw, 260px);
+  font-size: clamp(64px, 13vw, 196px);
   font-weight: 700;
-  font-style: italic;
-  -webkit-text-stroke: 1px var(--ink);
-  letter-spacing: -0.035em;
-  line-height: 0.86;
+  letter-spacing: -0.055em;
+  line-height: 0.92;
+  padding-bottom: 0.2em;
+  margin-bottom: -0.14em;
+  background: linear-gradient(180deg, var(--ink) 30%, color-mix(in srgb, var(--ink) 45%, transparent) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .opening__tag {
-  font-size: clamp(17px, 2vw, 25px);
+  font-size: clamp(17px, 1.8vw, 22px);
   color: var(--muted);
-  margin: 28px auto 0;
-  padding-top: 28px;
-  border-top: 1px solid var(--line);
-  max-width: 42ch;
-  line-height: 1.5;
+  margin: 26px auto 0;
+  max-width: 44ch;
+  line-height: 1.55;
 }
 
 .opening__scroll {
   position: absolute;
   bottom: 30px;
   left: 50%;
-  font-size: 12.5px;
+  font-family: var(--font-sans), Georgia, serif;
+  font-size: 12px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--muted);
@@ -239,16 +303,29 @@ main, [id] { scroll-margin-top: 100px; }
   50% { opacity: 1; transform: translate(-50%, 5px); }
 }
 
-.greeter { display: flex; flex-direction: column; align-items: center; gap: 18px; margin-top: 46px; }
+.greeter { display: flex; flex-direction: column; align-items: center; gap: 22px; margin-top: 40px; }
+/* The head sits in a pool of its own light. */
+.greeter > div:first-child {
+  filter: drop-shadow(0 0 48px color-mix(in srgb, var(--accent) 45%, transparent));
+}
+/* The caption reads like a live terminal line under the agent. */
 .greeter__caption {
-  font-size: 18px;
+  font-family: var(--font-sans), Georgia, serif;
+  font-size: 14.5px;
   color: var(--muted);
   margin: 0;
   min-height: 1.6em;
-  max-width: 44ch;
+  max-width: 52ch;
   line-height: 1.5;
-  transition: color 0.4s ease;
+  padding: 10px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--paper) 60%, transparent);
+  transition: color 0.4s ease, border-color 0.4s ease;
 }
+.greeter__caption::before { content: '› '; color: var(--accent); }
+.greeter__caption.is-success { border-color: color-mix(in srgb, var(--success) 45%, transparent); }
+.greeter__caption.is-failure { border-color: color-mix(in srgb, var(--failure) 45%, transparent); }
 
 .why, .path {
   display: grid;
@@ -257,17 +334,23 @@ main, [id] { scroll-margin-top: 100px; }
   border-top: 1px solid var(--line);
 }
 .why { padding: 120px 0; }
-.path { padding: 72px 0; }
-.paths .path:first-child { border-top: 1px solid var(--line); }
+.path {
+  padding: 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+.path:hover { border-color: transparent; box-shadow: var(--glow); background: var(--card-hover); }
+.paths { display: grid; gap: 20px; padding-top: 96px; border-top: 1px solid var(--line); }
 
 .why__q h2, .path h2 {
-  font-style: italic;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-weight: 600;
+  letter-spacing: -0.035em;
   line-height: 1.04;
 }
-.why__q h2 { font-size: clamp(38px, 5vw, 66px); -webkit-text-stroke: 0.4px var(--ink); max-width: 9ch; }
-.path h2 { font-size: clamp(30px, 3.4vw, 46px); -webkit-text-stroke: 0.3px var(--ink); margin-bottom: 20px; }
+.why__q h2 { font-size: clamp(38px, 5vw, 66px); max-width: 9ch; }
+.path h2 { font-size: clamp(30px, 3.4vw, 46px); margin-bottom: 20px; }
 
 .why__a p, .path__body {
   color: var(--muted);
@@ -295,12 +378,27 @@ main, [id] { scroll-margin-top: 100px; }
 }
 /* 19px is the floor of .why__a's own clamp, so these read as a continuation of
    the paragraph above rather than as fine print under it. */
+.skills { gap: 10px; }
 .skills li {
-  padding: 15px 0;
-  border-top: 1px solid var(--line);
-  font-size: 19px;
-  line-height: 1.5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-size: 16px;
+  line-height: 1.4;
   color: var(--ink);
+}
+.skills li::before {
+  content: '';
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-grad);
+  box-shadow: 0 0 10px var(--accent);
 }
 .path .eyebrow { margin-top: 10px; }
 .path__body { font-size: 18px; margin-bottom: 26px; }
@@ -309,15 +407,16 @@ main, [id] { scroll-margin-top: 100px; }
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  color: var(--ink);
+  color: #06070c;
+  background: var(--accent-grad);
   text-decoration: none;
-  font-size: 17px;
-  letter-spacing: 0.03em;
-  border-bottom: 1px solid var(--line-strong);
-  padding-bottom: 5px;
-  transition: border-color 0.25s ease, gap 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 12px 22px;
+  transition: box-shadow 0.25s ease, gap 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
-.path__cta:hover { border-color: var(--ink); gap: 15px; }
+.path__cta:hover { box-shadow: var(--glow); gap: 15px; }
 
 /* --- Architecture rail: vertical scroll drives horizontal travel --------- */
 /* The section is N viewports tall; the inner panel pins and the track slides.
@@ -375,9 +474,7 @@ main, [id] { scroll-margin-top: 100px; }
 .rail__title {
   flex: 1;
   font-size: clamp(30px, 3.6vw, 48px);
-  font-style: italic;
-  font-weight: 700;
-  -webkit-text-stroke: 0.3px var(--ink);
+  font-weight: 600;
   letter-spacing: -0.015em;
   display: flex;
   align-items: baseline;
@@ -389,7 +486,6 @@ main, [id] { scroll-margin-top: 100px; }
   font-style: normal;
   font-weight: 400;
   letter-spacing: 0.02em;
-  -webkit-text-stroke: 0;
   color: var(--muted);
 }
 
@@ -397,7 +493,9 @@ main, [id] { scroll-margin-top: 100px; }
 .rail__beat {
   margin: 0;
   flex: none;
-  font-size: 16px;
+  font-family: var(--font-sans), Georgia, serif;
+  color: var(--accent);
+  font-size: 14px;
   letter-spacing: 0.16em;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -412,7 +510,8 @@ main, [id] { scroll-margin-top: 100px; }
   right: var(--gutter);
   bottom: 0;
   height: 2px;
-  background: var(--ink);
+  background: var(--accent-grad);
+  box-shadow: 0 0 12px var(--accent);
   transform-origin: left center;
 }
 
@@ -456,7 +555,6 @@ main, [id] { scroll-margin-top: 100px; }
 .stage__caption { order: 2; }
 .stage__caption h3 {
   font-size: clamp(24px, 2vw, 32px);
-  font-style: italic;
   letter-spacing: -0.01em;
   margin: 0 0 4px;
 }
@@ -498,22 +596,22 @@ main, [id] { scroll-margin-top: 100px; }
   width: var(--vw-avail);
   margin: 56px 0 0 calc(50% - var(--vw-avail) / 2);
   overflow: hidden;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  padding: 30px 0;
+  padding: 8px 0;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
   mask-image: linear-gradient(90deg, transparent, #000 9%, #000 91%, transparent);
 }
 .marquee__track { display: flex; width: max-content; animation: marquee 62s linear infinite; }
 .marquee:hover .marquee__track { animation-play-state: paused; }
 .marquee__run { display: flex; align-items: center; list-style: none; margin: 0; padding: 0; }
+.marquee__run { gap: 12px; padding-right: 12px; }
 .marquee__run li {
   white-space: nowrap;
-  padding: 0 56px;
-  font-size: 23px;
-  letter-spacing: 0.02em;
+  padding: 10px 20px;
+  font-size: 15px;
   color: var(--muted);
-  border-right: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
   line-height: 1.4;
 }
 @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
@@ -526,9 +624,7 @@ main, [id] { scroll-margin-top: 100px; }
 .hero { padding: 64px 0 44px; }
 .hero h1 {
   font-size: clamp(48px, 6.5vw, 84px);
-  font-weight: 700;
-  font-style: italic;
-  -webkit-text-stroke: 0.6px var(--ink);
+  font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.02;
   margin: 16px 0 20px;
@@ -575,7 +671,7 @@ main, [id] { scroll-margin-top: 100px; }
   padding: 0 0 18px;
   border-bottom: 1px solid var(--line);
 }
-.panel header h2 { font-size: 26px; font-style: italic; margin-top: 8px; }
+.panel header h2 { font-size: 26px; margin-top: 8px; }
 .panel header svg { color: var(--muted); width: 20px; height: 20px; stroke-width: 1.4; }
 
 .job {
@@ -599,7 +695,7 @@ main, [id] { scroll-margin-top: 100px; }
 
 .approval { padding: 40px 0 0; }
 .approval > small { padding-bottom: 18px; border-bottom: 1px solid var(--line); }
-.approval h2 { font-size: 26px; font-style: italic; margin: 18px 0 12px; }
+.approval h2 { font-size: 26px; margin: 18px 0 12px; }
 .approval > p { color: var(--muted); line-height: 1.7; font-size: 17px; margin: 0 0 18px; }
 .approval > div {
   display: flex;
@@ -659,9 +755,7 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
 .auth-card { background: transparent; border: 0; padding: 0; width: 100%; max-width: 440px; }
 .auth-card h1 {
   font-size: 46px;
-  font-weight: 700;
-  font-style: italic;
-  -webkit-text-stroke: 0.35px var(--ink);
+  font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.08;
   margin-bottom: 16px;
@@ -830,7 +924,9 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
    =========================================================================== */
 
 @media (max-width: 900px) {
-  .why, .path { grid-template-columns: 1fr; gap: 24px; padding: 72px 0; }
+  .why, .path { grid-template-columns: 1fr; gap: 24px; }
+  .why { padding: 72px 0; }
+  .path { padding: 32px 26px; }
   .why__q h2, .path h2 { max-width: none; }
 }
 
@@ -838,7 +934,7 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
   :root { --gutter: 18px; }
   nav span { display: none; }
   nav strong { font-size: 22px; }
-  .opening h1 { -webkit-text-stroke: 0.5px var(--ink); }
+  .opening h1 { }
   .hero { padding: 40px 0 30px; }
   .metrics { grid-template-columns: 1fr 1fr; gap: 24px 0; }
   .grid { grid-template-columns: 1fr; gap: 0; }
@@ -857,13 +953,14 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
   aspect-ratio: 3 / 2;
   width: 100%;
   border: 1px solid var(--line);
+  border-radius: var(--radius);
   overflow: hidden;
-  transition: border-color 0.25s ease, background 0.25s ease;
-  /* The card is the same paper as the page, lifted by the faintest wash — the
-     separation is the hairline, not a fill. Same measure as a hovered job row. */
-  background: var(--wash);
+  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+  background:
+    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
+    var(--card);
 }
-.stage:hover .stage__card { border-color: var(--ink); background: transparent; }
+.stage:hover .stage__card { border-color: transparent; box-shadow: var(--glow); }
 
 /* Every drawing is `currentColor` throughout, so one declaration here colours
    every stroke and fill inside it. */
@@ -893,7 +990,8 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
   display: flex;
   align-items: baseline;
   gap: 14px;
-  font-size: 14px;
+  font-family: var(--font-sans), Georgia, serif;
+  font-size: 12.5px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--muted);
@@ -909,13 +1007,12 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
   padding-right: 14px;
   border-right: 1px solid currentColor;
   letter-spacing: 0.22em;
+  color: var(--accent);
 }
 
 .stage__caption h3 {
   font-size: clamp(26px, 2.3vw, 36px);
-  font-style: italic;
-  font-weight: 700;
-  -webkit-text-stroke: 0.3px currentColor;
+  font-weight: 600;
   letter-spacing: -0.012em;
   line-height: 1.1;
   margin: 0 0 10px;
@@ -1139,9 +1236,7 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 
 .argue__title h2 {
   font-size: clamp(34px, 4.4vw, 58px);
-  font-style: italic;
-  font-weight: 700;
-  -webkit-text-stroke: 0.4px var(--ink);
+  font-weight: 600;
   letter-spacing: -0.018em;
   line-height: 1.06;
   max-width: 17ch;
@@ -1171,16 +1266,23 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 .sides {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  border-top: 1px solid var(--line);
+  gap: 20px;
 }
-.side { display: flex; flex-direction: column; padding: 30px 52px 0 0; }
-.side + .side { padding-left: 52px; border-left: 1px solid var(--line); }
+.side {
+  display: flex;
+  flex-direction: column;
+  padding: 32px 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
 
 .side__steps { margin: 26px 0 0; }
 .side__steps > div { padding-bottom: 28px; }
 
 .side__steps dt {
   margin: 0;
+  font-family: var(--font-sans), Georgia, serif;
   font-size: clamp(30px, 3.2vw, 46px);
   line-height: 1;
   letter-spacing: -0.02em;
@@ -1206,15 +1308,15 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 .side__sum {
   margin: auto 0 0;
   padding-top: 20px;
-  border-top: 1px solid var(--ink);
+  border-top: 1px solid var(--line-strong);
   display: grid;
   gap: 9px;
 }
 .side__sum strong {
+  font-family: var(--font-sans), Georgia, serif;
+  color: var(--accent);
   font-size: clamp(32px, 3.5vw, 50px);
-  font-style: italic;
-  font-weight: 700;
-  -webkit-text-stroke: 0.3px var(--ink);
+  font-weight: 600;
   letter-spacing: -0.025em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -1226,21 +1328,26 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 .tally {
   /* Air above the total. It is the conclusion of the two columns, not the next
      row of them, and butting it up against the sums made it read as one. */
-  margin-top: 60px;
-  padding: 46px 0 40px;
-  border-top: 1px solid var(--ink);
-  border-bottom: 1px solid var(--line);
+  margin-top: 20px;
+  padding: 56px 24px 48px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(70% 90% at 50% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+    var(--card);
   text-align: center;
 }
 .tally__n {
   margin: 0;
   font-size: clamp(42px, 9.2vw, 138px);
-  font-style: italic;
-  font-weight: 700;
-  -webkit-text-stroke: 0.7px var(--ink);
+  font-weight: 600;
   letter-spacing: -0.042em;
   line-height: 0.92;
   font-variant-numeric: tabular-nums;
+  background: var(--accent-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .tally__u {
   margin: 24px auto 0;
@@ -1257,18 +1364,23 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 .tolls {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 0;
+  gap: 20px;
   /* Air between the total and what it converts into. They are two separate
      claims, and running them together made the second read as a footnote. */
-  margin-top: 36px;
+  margin-top: 20px;
 }
-.tolls article { padding: 34px 40px 0 0; display: grid; gap: 14px; align-content: start; }
-.tolls article + article { padding-left: 40px; border-left: 1px solid var(--line); }
+.tolls article {
+  padding: 30px 32px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+}
 .tolls strong {
   font-size: clamp(27px, 3vw, 44px);
-  font-style: italic;
-  font-weight: 700;
-  -webkit-text-stroke: 0.3px var(--ink);
+  font-weight: 600;
   letter-spacing: -0.022em;
   line-height: 1;
 }
@@ -1288,13 +1400,17 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   max-width: 30ch;
   counter-reset: gate;
 }
+.gate { display: grid; gap: 8px; }
 .gate li {
   display: flex;
   align-items: baseline;
   gap: 15px;
-  padding: 13px 0;
-  border-top: 1px solid var(--line);
-  font-size: 15.5px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  font-family: var(--font-sans), Georgia, serif;
+  font-size: 13px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
@@ -1307,11 +1423,11 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   color: var(--line-strong);
 }
 .gate .gate__last {
-  color: var(--ink);
-  border-top-color: var(--ink);
-  border-bottom: 1px solid var(--ink);
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 45%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
 }
-.gate .gate__last::before { content: '→'; color: var(--ink); letter-spacing: 0; }
+.gate .gate__last::before { content: '→'; color: var(--success); letter-spacing: 0; }
 
 /* --- One handshake on the wire ------------------------------------------ */
 /* Was a flat two-column log: a label column and a line column, seven identical
@@ -1326,47 +1442,60 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 .wire {
   list-style: none;
   margin: 68px 0 0;
-  padding: 34px 0 0;
-  border-top: 1px solid var(--line);
+  padding: 36px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--paper) 55%, transparent);
   display: grid;
-  gap: 26px;
+  gap: 14px;
 }
 
-.wire__turn { display: grid; gap: 9px; max-width: 62%; }
+.wire__turn {
+  display: grid;
+  gap: 6px;
+  max-width: 62%;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+}
 
 .wire__turn--you {
   margin-right: auto;
-  padding-left: 20px;
-  border-left: 2px solid var(--ink);
+  border-bottom-left-radius: 4px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .wire__turn--them {
   margin-left: auto;
-  padding-right: 20px;
-  border-right: 2px solid var(--line-strong);
+  border-bottom-right-radius: 4px;
+  background: var(--card-hover);
   text-align: right;
 }
 
 .wire__who {
   margin: 0;
-  font-size: 13px;
+  font-family: var(--font-sans), Georgia, serif;
+  font-size: 11.5px;
   letter-spacing: 0.15em;
   text-transform: uppercase;
   color: var(--muted);
   line-height: 1.5;
 }
-.wire__line { margin: 0; font-size: 18px; line-height: 1.55; }
+.wire__line { margin: 0; font-size: 16px; line-height: 1.55; }
 
 /* The one turn addressed to a human: hard rule 3's confirm step, given the full
    width and the only ink rule in the block. */
 .wire__turn--human {
   max-width: none;
   margin-top: 16px;
-  padding-top: 30px;
-  border-top: 1px solid var(--ink);
+  padding: 24px;
+  border-radius: 14px;
+  border-color: color-mix(in srgb, var(--success) 40%, transparent);
+  background: color-mix(in srgb, var(--success) 7%, transparent);
   justify-items: center;
   text-align: center;
 }
-.wire__turn--human .wire__who { color: var(--ink); }
+.wire__turn--human .wire__who { color: var(--success); }
 .wire__turn--human .wire__line { font-size: clamp(20px, 1.9vw, 25px); }
 
 /* --- Two agents, and you ------------------------------------------------ */
@@ -1374,17 +1503,20 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 .duet {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 0;
+  gap: 20px;
   margin-top: 68px;
-  border-top: 1px solid var(--line);
 }
-.duet article { padding: 34px 40px 0 0; }
-.duet article + article { padding-left: 40px; border-left: 1px solid var(--line); }
+.duet article {
+  padding: 30px 30px 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.duet article:hover { border-color: transparent; box-shadow: var(--glow); }
 .duet h3 {
   font-size: clamp(20px, 1.9vw, 27px);
-  font-style: italic;
-  font-weight: 700;
-  -webkit-text-stroke: 0.25px var(--ink);
+  font-weight: 600;
   letter-spacing: -0.012em;
   line-height: 1.15;
   margin: 12px 0 13px;
@@ -1401,16 +1533,10 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   .gate { max-width: none; }
   .count { margin-top: 52px; }
   .sides { grid-template-columns: 1fr; }
-  .side { padding: 28px 0 0; }
-  .side + .side { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+  .side { padding: 26px 24px; }
   .side__sum { margin-top: 4px; }
   .tolls, .duet { grid-template-columns: 1fr; }
-  .tolls article, .duet article { padding: 28px 0 0; }
-  .tolls article + article, .duet article + article {
-    padding-left: 0;
-    border-left: 0;
-    border-top: 1px solid var(--line);
-  }
+  .tolls article, .duet article { padding: 26px 24px; }
   .duet { margin-top: 48px; }
 }
 
@@ -1420,12 +1546,6 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 
   /* No room to stagger. Every turn goes full width and left-aligned; the speaker
      is still distinguished by the weight of its rule. */
-  .wire__turn { max-width: none; }
-  .wire__turn--them {
-    margin-left: 0;
-    padding: 0 0 0 20px;
-    border-right: 0;
-    border-left: 2px solid var(--line-strong);
-    text-align: left;
-  }
+  .wire { padding: 18px; }
+  .wire__turn { max-width: 92%; }
 }
