@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
+import { AccountLink } from '@/components/AccountLink';
 import { AgentGreeter } from '@/components/AgentGreeter';
 import { ArchitectureRail } from '@/components/ArchitectureRail';
 import { CountUp } from '@/components/CountUp';
@@ -164,7 +165,7 @@ export default function Home() {
           Signing up is not lost: both pathway CTAs at the foot of the page go
           straight to /signup with the role already chosen. */}
       <nav>
-        <Link href="/signin">Sign in</Link>
+        <AccountLink />
       </nav>
 
       {/* Screen one: the name, a single line, nothing else. */}
