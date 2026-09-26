@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { AgentFace, type FaceMood } from './AgentFace';
 
 /**
- * talentOS's face, everywhere it appears.
+ * agentHire's face, everywhere it appears.
  *
  * three.js is ~880 KB and needs a DOM, so the 3D head is client-only and split
  * into its own chunk. Until it arrives the flat face stands in — same character,

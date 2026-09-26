@@ -51,7 +51,7 @@ const STAGES: Stage[] = [
   {
     n: '05',
     act: 'The turn',
-    title: 'So we built talentOS.',
+    title: 'So we built agentHire.',
     line: 'One agent that applies for you, and refuses out loud when something is wrong.',
   },
   {
