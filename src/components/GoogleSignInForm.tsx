@@ -1,4 +1,9 @@
-import { googleSignInAction } from '@/app/actions/auth';
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useActionState } from 'react';
+
+import { signInWithGoogle, type AuthFormState } from '@/lib/auth';
 import type { Role } from '@/lib/users';
 
 /**
@@ -34,12 +39,12 @@ function GoogleMark() {
 }
 
 /**
- * Server-rendered: a plain form posting a server action, so Google sign-in works
- * with JavaScript disabled and needs no client bundle.
+ * A client component, because Firebase opens Google's sign-in in a popup from
+ * the browser.
  *
  * `role` matters. Google tells us nothing about which side of the handshake
  * someone is on, so if the landing page already asked, we carry that answer
- * through the OAuth round trip instead of asking again on the way back.
+ * with the form. It is not stored anywhere yet.
  */
 export function GoogleSignInForm({
   label = 'Continue with Google',
@@ -48,13 +53,25 @@ export function GoogleSignInForm({
   label?: string;
   role?: Role;
 }) {
+  const router = useRouter();
+  const [state, action, pending] = useActionState(async (): Promise<AuthFormState> => {
+    const result = await signInWithGoogle();
+    if (result.ok) router.push('/');
+    return result;
+  }, {});
+
   return (
-    <form action={googleSignInAction}>
+    <form action={action}>
+      {state.error ? (
+        <p className="auth-error" role="alert">
+          {state.error}
+        </p>
+      ) : null}
       {role ? <input type="hidden" name="role" value={role} /> : null}
       {/* Not `.secondary`: that one is square and is used across the product.
           This is the auth pages' own rounded outline button, matching the
           primary's footprint directly above it. */}
-      <button className="auth-alt" type="submit">
+      <button className="auth-alt" type="submit" disabled={pending}>
         <GoogleMark />
         {label}
       </button>

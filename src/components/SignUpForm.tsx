@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useActionState } from 'react';
 
-import { signUpAction, type AuthFormState } from '@/app/actions/auth';
+import { signUpWithEmail, type AuthFormState } from '@/lib/auth';
 import type { Role } from '@/lib/users';
 
 const initialState: AuthFormState = {};
@@ -22,7 +23,15 @@ const pathways: { value: Role; label: string; hint: string }[] = [
 ];
 
 export function SignUpForm({ role }: { role?: Role }) {
-  const [state, action, pending] = useActionState(signUpAction, initialState);
+  const router = useRouter();
+  const [state, action, pending] = useActionState(
+    async (_previous: AuthFormState, formData: FormData) => {
+      const result = await signUpWithEmail(formData);
+      if (result.ok) router.push('/');
+      return result;
+    },
+    initialState,
+  );
   const nameError = state.fieldErrors?.name;
   const emailError = state.fieldErrors?.email;
   const passwordError = state.fieldErrors?.password;
