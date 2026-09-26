@@ -1,13 +1,22 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useActionState } from 'react';
 
-import { signInAction, type AuthFormState } from '@/app/actions/auth';
+import { signInWithEmail, type AuthFormState } from '@/lib/auth';
 
 const initialState: AuthFormState = {};
 
 export function SignInForm() {
-  const [state, action, pending] = useActionState(signInAction, initialState);
+  const router = useRouter();
+  const [state, action, pending] = useActionState(
+    async (_previous: AuthFormState, formData: FormData) => {
+      const result = await signInWithEmail(formData);
+      if (result.ok) router.push('/');
+      return result;
+    },
+    initialState,
+  );
   const emailError = state.fieldErrors?.email;
   const passwordError = state.fieldErrors?.password;
 
