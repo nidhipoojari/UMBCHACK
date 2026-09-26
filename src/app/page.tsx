@@ -161,10 +161,10 @@ const paths = [
 export default function Home() {
   return (
     <main id="main">
-      {/* One control. Signing up is not lost: both pathway CTAs at the foot of
-          the page go straight to /signup with the role already chosen. */}
+      {/* One control, and no wordmark: the hero below already says the name.
+          Signing up is not lost: both pathway CTAs at the foot of the page go
+          straight to /signup with the role already chosen. */}
       <nav>
-        <strong>agentHire</strong>
         <AccountLink />
       </nav>
 
@@ -188,7 +188,7 @@ export default function Home() {
       {/* Screen three: the question, answered. */}
       <section className="why" aria-labelledby="why-h">
         <Reveal className="why__q" onScroll>
-          <h2 id="why-h">Why agentHire?</h2>
+          <h2 id="why-h">Why <span className="grad">agentHire</span>?</h2>
         </Reveal>
         <Reveal className="why__a" onScroll>
           <p>

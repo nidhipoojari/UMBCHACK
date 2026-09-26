@@ -1,0 +1,53 @@
+name: Deploy landing page
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# id-token is what lets this job mint a short-lived Google credential via
+# Workload Identity Federation. No service-account key is stored anywhere:
+# GCP blocks key creation on this project by org policy, and WIF is the
+# better answer anyway.
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  FIREBASE_PROJECT: project-96b6d773-106a-457a-a46
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/349500970232/locations/global/workloadIdentityPools/github/providers/github
+          service_account: github-actions-deploy@project-96b6d773-106a-457a-a46.iam.gserviceaccount.com
+
+      # Pull requests get a throwaway preview URL that expires in 7 days.
+      - name: Deploy preview
+        if: github.event_name == 'pull_request'
+        run: |
+          npx --yes firebase-tools@15 hosting:channel:deploy "pr-${{ github.event.number }}" \
+            --project "$FIREBASE_PROJECT" --expires 7d --non-interactive
+
+      # Pushes to main go straight to the live site.
+      - name: Deploy live
+        if: github.event_name != 'pull_request'
+        run: |
+          npx --yes firebase-tools@15 deploy --only hosting \
+            --project "$FIREBASE_PROJECT" --non-interactive
