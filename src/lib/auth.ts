@@ -13,6 +13,7 @@ import {
   type ApplicantProfile,
   destinationFor,
   type EmployerProfile,
+  type IntakeState,
   type Role,
   type UserRow,
 } from '@/lib/users';
@@ -62,6 +63,7 @@ function messageFor(error: unknown): string {
 export type Account = {
   user: UserRow;
   profile: ApplicantProfile | EmployerProfile | null;
+  intake: IntakeState;
 };
 
 /**
@@ -83,8 +85,8 @@ export async function fetchAccount(role?: Role, refresh = false): Promise<Accoun
 
 /** Records the sign-in and says where the user belongs next. */
 async function syncUser(role?: Role, refresh = false): Promise<string> {
-  const { user } = await fetchAccount(role, refresh);
-  return destinationFor(user.role);
+  const { user, intake } = await fetchAccount(role, refresh);
+  return destinationFor(user.role, intake);
 }
 
 // Sign-in validates only presence. Checking the email FORMAT here would let

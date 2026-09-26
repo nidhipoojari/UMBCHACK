@@ -24,7 +24,7 @@ export function AccountLink() {
         setDashboard(null);
         if (next) {
           fetchAccount()
-            .then(({ user: row }) => setDashboard(destinationFor(row.role)))
+            .then(({ user: row, intake }) => setDashboard(destinationFor(row.role, intake)))
             .catch(() => setDashboard(null));
         }
       }),

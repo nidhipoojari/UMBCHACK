@@ -61,7 +61,9 @@ export function Dashboard({ role }: { role: Role }) {
         }
         fetchAccount()
           .then((result) => {
-            if (result.user.role !== role) router.replace(destinationFor(result.user.role));
+            // Wrong side, or an applicant who has not finished onboarding.
+            const destination = destinationFor(result.user.role, result.intake);
+            if (destination !== `/${role}`) router.replace(destination);
             else setAccount(result);
           })
           .catch(() => setError('Could not load your account. Try refreshing.'));

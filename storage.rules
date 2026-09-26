@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// Uploads bucket (agenthire-uploads-349500970232).
+// An applicant can write only into their own folder, only PDFs, only up to
+// 10 MB, and only new files (no overwriting a resume the extractor has read).
+// Reads are theirs too; nothing is public.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /applicants/{uid}/resumes/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && fileName.matches('[0-9a-f-]{36}[.]pdf')
+        && request.resource.contentType == 'application/pdf'
+        && request.resource.size < 10 * 1024 * 1024;
+    }
+  }
+}

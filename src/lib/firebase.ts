@@ -1,5 +1,6 @@
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
 
 /**
  * The Firebase web config is public by design: it identifies the project, it
@@ -17,3 +18,10 @@ const config = {
 // Reuse the app across hot reloads instead of initializing it twice.
 export const firebaseApp = getApps().length ? getApp() : initializeApp(config);
 export const firebaseAuth = getAuth(firebaseApp);
+
+// Resumes go to the uploads bucket, not the project's default one. Uploading
+// there is what triggers the extract-resume Cloud Function.
+export const uploadsStorage = getStorage(
+  firebaseApp,
+  `gs://${process.env.NEXT_PUBLIC_FIREBASE_UPLOADS_BUCKET}`,
+);
