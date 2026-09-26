@@ -2,22 +2,24 @@
    AGENTHIRE — DESIGN SYSTEM
    One file, no override stacking. See docs/FRONTEND_UIUX_PLAN.txt §5.
 
-   Dark, one face (Forum) for everything. Two signal
-   colours, one indigo-to-cyan accent that only ever marks the thing to look at.
-   Content sits in rounded glass cards; the page itself carries a soft glow.
+   Two colours, nothing else: white paper and dark-blue ink. Every other shade
+   on the page is ink at a lower opacity. One face (Forum) for everything.
+   Content sits in rounded cards separated by ink hairlines.
    =========================================================================== */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  --paper: #07080d;
-  --ink: #e8ebf5;
-  --success: #34d399;
-  --failure: #f87171;
+  --paper: #ffffff;
+  --ink: #0b2545;
 
-  --accent: #818cf8;
-  --accent-2: #22d3ee;
-  --accent-grad: linear-gradient(120deg, var(--accent) 0%, var(--accent-2) 100%);
+  /* Signals and accents are the ink itself. State is carried by words, icons
+     and the agent's face, not by extra colours. */
+  --success: var(--ink);
+  --failure: var(--ink);
+  --accent: var(--ink);
+  --accent-2: var(--ink);
+  --accent-grad: linear-gradient(var(--ink), var(--ink));
 
   --line: color-mix(in srgb, var(--ink) 9%, transparent);
   --line-strong: color-mix(in srgb, var(--ink) 18%, transparent);
@@ -27,8 +29,7 @@
   --card: color-mix(in srgb, var(--ink) 3%, transparent);
   --card-hover: color-mix(in srgb, var(--ink) 5.5%, transparent);
   --radius: 18px;
-  --glow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
-    0 18px 60px -18px color-mix(in srgb, var(--accent) 45%, transparent);
+  --glow: 0 0 0 1px var(--ink), 0 18px 40px -22px color-mix(in srgb, var(--ink) 40%, transparent);
 
   --nav-h: 84px;
   --gutter: 34px;
@@ -73,13 +74,7 @@ body {
 
 body {
   margin: 0;
-  /* Two soft pools of accent light, fixed so they stay put while content
-     scrolls over them. */
-  background:
-    radial-gradient(60rem 40rem at 15% -10%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
-    radial-gradient(50rem 36rem at 95% 10%, color-mix(in srgb, var(--accent-2) 10%, transparent), transparent 60%),
-    var(--paper);
-  background-attachment: fixed;
+  background: var(--paper);
   color: var(--ink);
   font-family: var(--font-sans), Georgia, serif;
   font-size: 17px;
@@ -87,7 +82,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: color-mix(in srgb, var(--accent) 40%, transparent); color: var(--ink); }
+::selection { background: var(--ink); color: var(--paper); }
 
 button { font: inherit; cursor: pointer; }
 code { font-family: var(--font-sans), Georgia, serif; font-size: 0.92em; }
@@ -161,7 +156,6 @@ nav strong::before {
   height: 12px;
   border-radius: 4px;
   background: var(--accent-grad);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 70%, transparent);
 }
 nav a, nav span { color: var(--ink); font-size: 15px; text-decoration: none; }
 nav > a {
@@ -195,7 +189,7 @@ nav button:hover { border-color: var(--ink); }
   background: var(--accent-grad);
   border: 0;
   border-radius: 999px;
-  color: #06070c;
+  color: var(--paper);
   font-weight: 600;
   padding: 13px 22px;
   text-decoration: none;
@@ -272,10 +266,7 @@ main, [id] { scroll-margin-top: 100px; }
   line-height: 0.92;
   padding-bottom: 0.2em;
   margin-bottom: -0.14em;
-  background: linear-gradient(180deg, var(--ink) 30%, color-mix(in srgb, var(--ink) 45%, transparent) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--ink);
 }
 
 .opening__tag {
@@ -306,7 +297,7 @@ main, [id] { scroll-margin-top: 100px; }
 .greeter { display: flex; flex-direction: column; align-items: center; gap: 22px; margin-top: 40px; }
 /* The head sits in a pool of its own light. */
 .greeter > div:first-child {
-  filter: drop-shadow(0 0 48px color-mix(in srgb, var(--accent) 45%, transparent));
+  filter: drop-shadow(0 18px 30px color-mix(in srgb, var(--ink) 18%, transparent));
 }
 /* The caption reads like a live terminal line under the agent. */
 .greeter__caption {
@@ -398,7 +389,6 @@ main, [id] { scroll-margin-top: 100px; }
   height: 7px;
   border-radius: 50%;
   background: var(--accent-grad);
-  box-shadow: 0 0 10px var(--accent);
 }
 .path .eyebrow { margin-top: 10px; }
 .path__body { font-size: 18px; margin-bottom: 26px; }
@@ -407,7 +397,7 @@ main, [id] { scroll-margin-top: 100px; }
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  color: #06070c;
+  color: var(--paper);
   background: var(--accent-grad);
   text-decoration: none;
   font-size: 15px;
@@ -511,7 +501,6 @@ main, [id] { scroll-margin-top: 100px; }
   bottom: 0;
   height: 2px;
   background: var(--accent-grad);
-  box-shadow: 0 0 12px var(--accent);
   transform-origin: left center;
 }
 
@@ -957,7 +946,6 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
   overflow: hidden;
   transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
   background:
-    radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 70%),
     var(--card);
 }
 .stage:hover .stage__card { border-color: transparent; box-shadow: var(--glow); }
@@ -1333,7 +1321,6 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background:
-    radial-gradient(70% 90% at 50% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
     var(--card);
   text-align: center;
 }
