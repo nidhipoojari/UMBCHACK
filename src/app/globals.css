@@ -494,6 +494,10 @@ main, [id] { scroll-margin-top: 100px; }
      padding is not reliably counted in scrollWidth — and scrollWidth is what
      ArchitectureRail measures the travel from. */
   padding-left: var(--page-inset);
+  /* Without min-height: 0 the track grows to its content and the pin's
+     overflow: hidden clips the captions off the bottom on shorter screens. */
+  min-height: 0;
+  padding-block: clamp(16px, 3vh, 32px);
   will-change: transform;
 }
 .rail__track .stage:last-child { margin-right: var(--page-inset); }
@@ -506,12 +510,16 @@ main, [id] { scroll-margin-top: 100px; }
   display: flex;
   flex-direction: column;
   gap: 24px;
+  /* Never taller than the band. The drawing gives up height, the words don't. */
+  max-height: 100%;
 }
 
 /* The card is the bordered box; the caption sits outside and below it. */
 .stage__card {
   order: 1;
   height: min(60vh, 560px);
+  flex: 0 1 auto;
+  min-height: 0;
   padding: 38px 36px;
   display: flex;
   flex-direction: column;
@@ -520,7 +528,7 @@ main, [id] { scroll-margin-top: 100px; }
 }
 .stage:hover .stage__card { box-shadow: var(--glow); }
 
-.stage__caption { order: 2; }
+.stage__caption { order: 2; flex-shrink: 0; }
 .stage__caption h3 {
   font-size: clamp(24px, 2vw, 32px);
   letter-spacing: -0.01em;
@@ -546,7 +554,7 @@ main, [id] { scroll-margin-top: 100px; }
 .rail--static .rail__head::after { left: 0; right: 0; }
 .rail__stack { display: grid; gap: 0; }
 .rail--static .rail__stack { gap: 20px; }
-.rail--static .stage { flex: none; }
+.rail--static .stage { flex: none; max-height: none; }
 .rail--static .stage__card { height: auto; padding: 32px 30px; overflow: visible; }
 
 @media (max-width: 760px) {
