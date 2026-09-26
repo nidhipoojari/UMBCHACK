@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import type { FaceMood } from './AgentFace';
 
 /**
- * talentOS's face, with real form.
+ * agentHire's face, with real form.
  *
  * SAME CHARACTER, NOT A NEW ONE. Every coordinate below is lifted from the SVG in
  * AgentFace.tsx and projected onto the sphere, so the 3D head is the 2D drawing

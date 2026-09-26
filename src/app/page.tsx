@@ -163,13 +163,13 @@ export default function Home() {
       {/* One control. Signing up is not lost: both pathway CTAs at the foot of
           the page go straight to /signup with the role already chosen. */}
       <nav>
-        <strong>talentOS</strong>
+        <strong>agentHire</strong>
         <Link href="/signin">Sign in</Link>
       </nav>
 
       {/* Screen one: the name, a single line, nothing else. */}
       <Reveal as="section" className="opening">
-        <h1>talentOS</h1>
+        <h1>agentHire</h1>
         <p className="opening__tag">
           A voice-first job application agent. Neither side moves until both prove who they are.
         </p>
@@ -187,7 +187,7 @@ export default function Home() {
       {/* Screen three: the question, answered. */}
       <section className="why" aria-labelledby="why-h">
         <Reveal className="why__q" onScroll>
-          <h2 id="why-h">Why talentOS?</h2>
+          <h2 id="why-h">Why agentHire?</h2>
         </Reveal>
         <Reveal className="why__a" onScroll>
           <p>
