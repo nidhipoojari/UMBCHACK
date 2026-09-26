@@ -202,6 +202,27 @@ a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visibl
 }
 .skip-link:focus { left: 16px; }
 
+/* Cursor sparkles: one fixed layer over everything, never catching a click.
+   Each spark is centred on its point with a negative translate baked into the
+   margin, so anime.js owns the transform outright. */
+.sparkles {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  overflow: hidden;
+}
+.spark {
+  position: absolute;
+  display: block;
+  color: var(--ink);
+  will-change: transform, opacity;
+}
+.spark > svg { display: block; transform: translate(-50%, -50%); }
+.spark--dust { border-radius: 50%; background: var(--ink); translate: -50% -50%; }
+/* The big flash is a touch lighter so it reads as light, not as a stamp. */
+.spark--glint { color: color-mix(in srgb, var(--ink) 55%, transparent); }
+
 .sr-only {
   position: absolute;
   width: 1px; height: 1px;
