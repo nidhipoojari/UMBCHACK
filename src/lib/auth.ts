@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 
 import { firebaseAuth } from '@/lib/firebase';
+import type { Role } from '@/lib/users';
 
 export type AuthFormState = {
   ok?: boolean;
@@ -44,8 +45,25 @@ function messageFor(error: unknown): string {
     case 'auth/network-request-failed':
       return 'Could not reach the sign-in service. Check your connection.';
     default:
-      return 'Something went wrong. Try again.';
+      return error instanceof Error && error.message === 'Could not save your account.'
+        ? 'Signed in, but we could not save your account. Try again.'
+        : 'Something went wrong. Try again.';
   }
+}
+
+/**
+ * Records the signed-in user (and their pathway, when we know it) in Cloud SQL.
+ * `refresh` forces a new ID token, needed right after sign-up so the token
+ * carries the display name that was just set.
+ */
+async function syncUser(role?: Role, refresh = false): Promise<void> {
+  const token = await firebaseAuth.currentUser?.getIdToken(refresh);
+  const response = await fetch('/api/users', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+  if (!response.ok) throw new Error('Could not save your account.');
 }
 
 // Sign-in validates only presence. Checking the email FORMAT here would let
@@ -61,6 +79,7 @@ export async function signInWithEmail(formData: FormData): Promise<AuthFormState
 
   try {
     await signInWithEmailAndPassword(firebaseAuth, email, password);
+    await syncUser();
     return { ok: true };
   } catch (error) {
     return { error: messageFor(error) };
@@ -83,15 +102,17 @@ export async function signUpWithEmail(formData: FormData): Promise<AuthFormState
   try {
     const { user } = await createUserWithEmailAndPassword(firebaseAuth, email, password);
     if (name) await updateProfile(user, { displayName: name });
+    await syncUser(role as Role, true);
     return { ok: true };
   } catch (error) {
     return { error: messageFor(error) };
   }
 }
 
-export async function signInWithGoogle(): Promise<AuthFormState> {
+export async function signInWithGoogle(role?: Role): Promise<AuthFormState> {
   try {
     await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
+    await syncUser(role);
     return { ok: true };
   } catch (error) {
     // Closing the window is a choice, not a failure worth a red banner.

@@ -44,7 +44,7 @@ function GoogleMark() {
  *
  * `role` matters. Google tells us nothing about which side of the handshake
  * someone is on, so if the landing page already asked, we carry that answer
- * with the form. It is not stored anywhere yet.
+ * into the users table when the account is recorded.
  */
 export function GoogleSignInForm({
   label = 'Continue with Google',
@@ -55,7 +55,7 @@ export function GoogleSignInForm({
 }) {
   const router = useRouter();
   const [state, action, pending] = useActionState(async (): Promise<AuthFormState> => {
-    const result = await signInWithGoogle();
+    const result = await signInWithGoogle(role);
     if (result.ok) router.push('/');
     return result;
   }, {});
