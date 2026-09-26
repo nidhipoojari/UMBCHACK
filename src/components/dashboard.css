@@ -1,0 +1,20 @@
+/* Placeholder dashboards. Uses the landing page's nav, type and tokens; only
+   the page frame and the profile list are new. */
+.dashboard {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 24px 96px;
+}
+.dashboard nav strong a { color: inherit; text-decoration: none; }
+
+.dashboard__head { padding: 64px 0 8px; }
+.dashboard__head h1 { font-size: clamp(40px, 6vw, 64px); line-height: 1.05; margin: 12px 0 16px; }
+
+.dashboard__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 24px 40px;
+  margin: 24px 0 0;
+}
+.dashboard__fields dt { color: var(--muted); font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; }
+.dashboard__fields dd { margin: 6px 0 0; font-size: 19px; overflow-wrap: anywhere; }
