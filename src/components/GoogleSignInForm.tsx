@@ -66,7 +66,7 @@ export function GoogleSignInForm({
     if (requireRole && !chosen) return { error: 'Choose which describes you first.' };
 
     const result = await signInWithGoogle(chosen);
-    if (result.ok) router.push('/');
+    if (result.ok) router.push(result.next ?? '/');
     return result;
   }, {});
 

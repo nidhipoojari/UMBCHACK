@@ -9,10 +9,18 @@ import {
 } from 'firebase/auth';
 
 import { firebaseAuth } from '@/lib/firebase';
-import type { Role } from '@/lib/users';
+import {
+  type ApplicantProfile,
+  destinationFor,
+  type EmployerProfile,
+  type Role,
+  type UserRow,
+} from '@/lib/users';
 
 export type AuthFormState = {
   ok?: boolean;
+  /** Where to go next: the user's dashboard, or back to /signup to pick a role. */
+  next?: string;
   error?: string;
   fieldErrors?: Record<string, string>;
 };
@@ -51,12 +59,18 @@ function messageFor(error: unknown): string {
   }
 }
 
+export type Account = {
+  user: UserRow;
+  profile: ApplicantProfile | EmployerProfile | null;
+};
+
 /**
- * Records the signed-in user (and their pathway, when we know it) in Cloud SQL.
+ * Records the signed-in user (and their pathway, when we know it) in Cloud SQL,
+ * which also creates their role's profile row, and returns the account.
  * `refresh` forces a new ID token, needed right after sign-up so the token
  * carries the display name that was just set.
  */
-async function syncUser(role?: Role, refresh = false): Promise<void> {
+export async function fetchAccount(role?: Role, refresh = false): Promise<Account> {
   const token = await firebaseAuth.currentUser?.getIdToken(refresh);
   const response = await fetch('/api/users', {
     method: 'POST',
@@ -64,6 +78,13 @@ async function syncUser(role?: Role, refresh = false): Promise<void> {
     body: JSON.stringify({ role }),
   });
   if (!response.ok) throw new Error('Could not save your account.');
+  return (await response.json()) as Account;
+}
+
+/** Records the sign-in and says where the user belongs next. */
+async function syncUser(role?: Role, refresh = false): Promise<string> {
+  const { user } = await fetchAccount(role, refresh);
+  return destinationFor(user.role);
 }
 
 // Sign-in validates only presence. Checking the email FORMAT here would let
@@ -79,8 +100,7 @@ export async function signInWithEmail(formData: FormData): Promise<AuthFormState
 
   try {
     await signInWithEmailAndPassword(firebaseAuth, email, password);
-    await syncUser();
-    return { ok: true };
+    return { ok: true, next: await syncUser() };
   } catch (error) {
     return { error: messageFor(error) };
   }
@@ -102,8 +122,7 @@ export async function signUpWithEmail(formData: FormData): Promise<AuthFormState
   try {
     const { user } = await createUserWithEmailAndPassword(firebaseAuth, email, password);
     if (name) await updateProfile(user, { displayName: name });
-    await syncUser(role as Role, true);
-    return { ok: true };
+    return { ok: true, next: await syncUser(role as Role, true) };
   } catch (error) {
     return { error: messageFor(error) };
   }
@@ -112,8 +131,7 @@ export async function signUpWithEmail(formData: FormData): Promise<AuthFormState
 export async function signInWithGoogle(role?: Role): Promise<AuthFormState> {
   try {
     await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
-    await syncUser(role);
-    return { ok: true };
+    return { ok: true, next: await syncUser(role) };
   } catch (error) {
     // Closing the window is a choice, not a failure worth a red banner.
     if (error instanceof FirebaseError && error.code === 'auth/popup-closed-by-user') return {};

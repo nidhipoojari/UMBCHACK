@@ -12,7 +12,7 @@ export function SignInForm() {
   const [state, action, pending] = useActionState(
     async (_previous: AuthFormState, formData: FormData) => {
       const result = await signInWithEmail(formData);
-      if (result.ok) router.push('/');
+      if (result.ok) router.push(result.next ?? '/');
       return result;
     },
     initialState,

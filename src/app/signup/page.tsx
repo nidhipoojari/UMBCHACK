@@ -19,7 +19,7 @@ export default async function SignUpPage({
 }) {
   // The landing page links here with ?role=…, so the pathway is already decided
   // and the form does not ask again.
-  const { role } = await searchParams;
+  const { role, error } = await searchParams;
   const chosen = asRole(role);
 
   return (
@@ -37,6 +37,12 @@ export default async function SignUpPage({
             ? 'Both sides are real accounts, because both sides have to prove who they are.'
             : 'Pick your side. Both are real accounts, because both sides have to prove who they are.'}
         </p>
+
+        {error === 'pick-role' ? (
+          <p className="auth-error" role="alert">
+            One more step: choose which describes you to finish setting up your account.
+          </p>
+        ) : null}
 
         <SignUpForm role={chosen} />
 
