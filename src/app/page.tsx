@@ -160,10 +160,10 @@ const paths = [
 export default function Home() {
   return (
     <main id="main">
-      {/* One control. Signing up is not lost: both pathway CTAs at the foot of
-          the page go straight to /signup with the role already chosen. */}
+      {/* One control, and no wordmark: the hero below already says the name.
+          Signing up is not lost: both pathway CTAs at the foot of the page go
+          straight to /signup with the role already chosen. */}
       <nav>
-        <strong>agentHire</strong>
         <Link href="/signin">Sign in</Link>
       </nav>
 

@@ -29,7 +29,7 @@
   --card: color-mix(in srgb, var(--ink) 3%, transparent);
   --card-hover: color-mix(in srgb, var(--ink) 5.5%, transparent);
   --radius: 18px;
-  --glow: 0 0 0 1px var(--ink), 0 18px 40px -22px color-mix(in srgb, var(--ink) 40%, transparent);
+  --glow: 0 18px 40px -20px color-mix(in srgb, var(--ink) 35%, transparent);
 
   --nav-h: 84px;
   --gutter: 34px;
@@ -127,10 +127,11 @@ nav {
   height: var(--nav-h);
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 28px;
   font-size: 15px;
 }
-/* Full-bleed frosted glass: content blurs as it scrolls under the wordmark. */
+/* Full-bleed frosted glass: content blurs as it scrolls under the nav. */
 nav::before {
   content: '';
   position: absolute;
@@ -140,22 +141,6 @@ nav::before {
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid var(--line);
   z-index: -1;
-}
-nav strong {
-  margin-right: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-nav strong::before {
-  content: '';
-  width: 12px;
-  height: 12px;
-  border-radius: 4px;
-  background: var(--accent-grad);
 }
 nav a, nav span { color: var(--ink); font-size: 15px; text-decoration: none; }
 nav > a {
@@ -309,14 +294,11 @@ main, [id] { scroll-margin-top: 100px; }
   max-width: 52ch;
   line-height: 1.5;
   padding: 10px 18px;
-  border: 1px solid var(--line);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--paper) 60%, transparent);
-  transition: color 0.4s ease, border-color 0.4s ease;
+  background: var(--card);
+  transition: color 0.4s ease;
 }
 .greeter__caption::before { content: '› '; color: var(--accent); }
-.greeter__caption.is-success { border-color: color-mix(in srgb, var(--success) 45%, transparent); }
-.greeter__caption.is-failure { border-color: color-mix(in srgb, var(--failure) 45%, transparent); }
 
 .why, .path {
   display: grid;
@@ -327,12 +309,11 @@ main, [id] { scroll-margin-top: 100px; }
 .why { padding: 120px 0; }
 .path {
   padding: 48px;
-  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--card);
   transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
-.path:hover { border-color: transparent; box-shadow: var(--glow); background: var(--card-hover); }
+.path:hover { box-shadow: var(--glow); background: var(--card-hover); }
 .paths { display: grid; gap: 20px; padding-top: 96px; border-top: 1px solid var(--line); }
 
 .why__q h2, .path h2 {
@@ -375,7 +356,6 @@ main, [id] { scroll-margin-top: 100px; }
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--card);
   font-size: 16px;
@@ -514,6 +494,10 @@ main, [id] { scroll-margin-top: 100px; }
      padding is not reliably counted in scrollWidth — and scrollWidth is what
      ArchitectureRail measures the travel from. */
   padding-left: var(--page-inset);
+  /* Without min-height: 0 the track grows to its content and the pin's
+     overflow: hidden clips the captions off the bottom on shorter screens. */
+  min-height: 0;
+  padding-block: clamp(16px, 3vh, 32px);
   will-change: transform;
 }
 .rail__track .stage:last-child { margin-right: var(--page-inset); }
@@ -526,22 +510,25 @@ main, [id] { scroll-margin-top: 100px; }
   display: flex;
   flex-direction: column;
   gap: 24px;
+  /* Never taller than the band. The drawing gives up height, the words don't. */
+  max-height: 100%;
 }
 
 /* The card is the bordered box; the caption sits outside and below it. */
 .stage__card {
   order: 1;
   height: min(60vh, 560px);
-  border: 1px solid var(--line);
+  flex: 0 1 auto;
+  min-height: 0;
   padding: 38px 36px;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   transition: border-color 0.25s ease;
 }
-.stage:hover .stage__card { border-color: var(--ink); }
+.stage:hover .stage__card { box-shadow: var(--glow); }
 
-.stage__caption { order: 2; }
+.stage__caption { order: 2; flex-shrink: 0; }
 .stage__caption h3 {
   font-size: clamp(24px, 2vw, 32px);
   letter-spacing: -0.01em;
@@ -567,7 +554,7 @@ main, [id] { scroll-margin-top: 100px; }
 .rail--static .rail__head::after { left: 0; right: 0; }
 .rail__stack { display: grid; gap: 0; }
 .rail--static .rail__stack { gap: 20px; }
-.rail--static .stage { flex: none; }
+.rail--static .stage { flex: none; max-height: none; }
 .rail--static .stage__card { height: auto; padding: 32px 30px; overflow: visible; }
 
 @media (max-width: 760px) {
@@ -592,16 +579,21 @@ main, [id] { scroll-margin-top: 100px; }
 .marquee__track { display: flex; width: max-content; animation: marquee 62s linear infinite; }
 .marquee:hover .marquee__track { animation-play-state: paused; }
 .marquee__run { display: flex; align-items: center; list-style: none; margin: 0; padding: 0; }
-.marquee__run { gap: 12px; padding-right: 12px; }
+/* Plain text, separated by a bar. Every item carries its own trailing bar,
+   including the last, so the seam between the two runs looks like any other
+   gap. The empty alt text keeps screen readers from announcing "vertical bar". */
 .marquee__run li {
+  display: flex;
+  align-items: center;
   white-space: nowrap;
-  padding: 10px 20px;
-  font-size: 15px;
+  font-size: clamp(24px, 2.6vw, 34px);
   color: var(--muted);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--card);
   line-height: 1.4;
+}
+.marquee__run li::after {
+  content: '|' / '';
+  padding: 0 40px;
+  color: var(--line-strong);
 }
 @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
@@ -905,7 +897,7 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
   .marquee__track { animation: none; width: 100%; }
   .marquee__run { flex-wrap: wrap; justify-content: center; }
   .marquee__run[aria-hidden='true'] { display: none; }
-  .marquee__run li { border-right: 0; padding: 7px 20px; font-size: 18px; }
+  .marquee__run li { padding: 7px 0; font-size: 24px; }
 }
 
 /* ===========================================================================
@@ -922,7 +914,6 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
 @media (max-width: 760px) {
   :root { --gutter: 18px; }
   nav span { display: none; }
-  nav strong { font-size: 22px; }
   .opening h1 { }
   .hero { padding: 40px 0 30px; }
   .metrics { grid-template-columns: 1fr 1fr; gap: 24px 0; }
@@ -941,14 +932,13 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
      letterboxing every one of them. */
   aspect-ratio: 3 / 2;
   width: 100%;
-  border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
   transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
   background:
     var(--card);
 }
-.stage:hover .stage__card { border-color: transparent; box-shadow: var(--glow); }
+.stage:hover .stage__card { box-shadow: var(--glow); }
 
 /* Every drawing is `currentColor` throughout, so one declaration here colours
    every stroke and fill inside it. */
@@ -1260,7 +1250,6 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   display: flex;
   flex-direction: column;
   padding: 32px 36px;
-  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--card);
 }
@@ -1318,7 +1307,6 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
      row of them, and butting it up against the sums made it read as one. */
   margin-top: 20px;
   padding: 56px 24px 48px;
-  border: 1px solid var(--line);
   border-radius: var(--radius);
   background:
     var(--card);
@@ -1361,7 +1349,6 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   display: grid;
   gap: 14px;
   align-content: start;
-  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--card);
 }
@@ -1393,7 +1380,6 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   align-items: baseline;
   gap: 15px;
   padding: 12px 16px;
-  border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--card);
   font-family: var(--font-sans), Georgia, serif;
@@ -1411,7 +1397,6 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 }
 .gate .gate__last {
   color: var(--success);
-  border-color: color-mix(in srgb, var(--success) 45%, transparent);
   background: color-mix(in srgb, var(--success) 8%, transparent);
 }
 .gate .gate__last::before { content: '→'; color: var(--success); letter-spacing: 0; }
@@ -1430,9 +1415,8 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   list-style: none;
   margin: 68px 0 0;
   padding: 36px;
-  border: 1px solid var(--line);
   border-radius: var(--radius);
-  background: color-mix(in srgb, var(--paper) 55%, transparent);
+  background: var(--card);
   display: grid;
   gap: 14px;
 }
@@ -1443,14 +1427,12 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   max-width: 62%;
   padding: 14px 18px;
   border-radius: 16px;
-  border: 1px solid var(--line);
 }
 
 .wire__turn--you {
   margin-right: auto;
   border-bottom-left-radius: 4px;
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
 }
 .wire__turn--them {
   margin-left: auto;
@@ -1477,7 +1459,6 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   margin-top: 16px;
   padding: 24px;
   border-radius: 14px;
-  border-color: color-mix(in srgb, var(--success) 40%, transparent);
   background: color-mix(in srgb, var(--success) 7%, transparent);
   justify-items: center;
   text-align: center;
@@ -1495,12 +1476,11 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 }
 .duet article {
   padding: 30px 30px 34px;
-  border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--card);
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
-.duet article:hover { border-color: transparent; box-shadow: var(--glow); }
+.duet article:hover { box-shadow: var(--glow); }
 .duet h3 {
   font-size: clamp(20px, 1.9vw, 27px);
   font-weight: 600;
