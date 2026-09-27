@@ -1617,3 +1617,27 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
     grid-column: 2;
   }
 }
+
+/* The generated transcript sits above the audit feed and is visibly not it:
+   no receipt, no verified badge, and a note saying where the words came from.
+   Same bubble shapes so it reads as a conversation; different chrome so it is
+   never mistaken for delivered mail. */
+.agent-transcript { margin-bottom: 14px; }
+.agent-transcript h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+.agent-transcript-note {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+.agent-transcript .agent-bubble { background: color-mix(in srgb, currentColor 5%, transparent); }
