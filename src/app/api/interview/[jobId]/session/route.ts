@@ -1,5 +1,6 @@
 import { buildSession } from '@/lib/interview';
 import { requireApplicant } from '@/lib/require-applicant';
+import { fromJobSlug } from '@/lib/job-slug';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -18,7 +19,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ jobI
   if (user instanceof Response) return user;
   const { jobId } = await params;
 
-  const payload = await buildSession(user.id, decodeURIComponent(jobId));
+  const payload = await buildSession(user.id, fromJobSlug(jobId));
   if ('error' in payload) return Response.json({ error: payload.error }, { status: payload.status });
   return Response.json(payload, { headers: { 'cache-control': 'no-store, private' } });
 }

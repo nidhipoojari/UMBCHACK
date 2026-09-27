@@ -3,6 +3,7 @@ import { loadContext } from '@/lib/artifacts/context';
 import { listArtifacts } from '@/lib/artifacts/store';
 import { requireApplicant } from '@/lib/require-applicant';
 import { sql } from '@/lib/sql';
+import { fromJobSlug } from '@/lib/job-slug';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ jobI
   const { jobId } = await params;
 
   try {
-    const context = await loadContext(sql, user.id, decodeURIComponent(jobId));
+    const context = await loadContext(sql, user.id, fromJobSlug(jobId));
     if (!context.ok) return Response.json({ error: context.error }, { status: context.status });
 
     // A malformed posting should cost the reads, not the whole panel.

@@ -2,6 +2,7 @@ import { currentStage, isInterviewSessionId, recallSession } from '@/lib/intervi
 import { interviewUnlocked, lockedReason } from '@/lib/interview-contract';
 import { signLiveTicket } from '@/lib/interview-live';
 import { requireApplicant } from '@/lib/require-applicant';
+import { fromJobSlug } from '@/lib/job-slug';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request, { params }: { params: Promise<{ jobId: string }> }) {
   const user = await requireApplicant(request);
   if (user instanceof Response) return user;
-  const jobId = decodeURIComponent((await params).jobId);
+  const jobId = fromJobSlug((await params).jobId);
 
   let body: { sessionId?: unknown };
   try {

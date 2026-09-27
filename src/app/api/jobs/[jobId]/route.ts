@@ -3,6 +3,7 @@ import { getJob } from '@/lib/jobs';
 import { currentStage } from '@/lib/pipeline';
 import { requireApplicant } from '@/lib/require-applicant';
 import { sql } from '@/lib/sql';
+import { fromJobSlug } from '@/lib/job-slug';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ jobI
   if (user instanceof Response) return user;
   const { jobId } = await params;
 
-  const job = await getJob(decodeURIComponent(jobId));
+  const job = await getJob(fromJobSlug(jobId));
   if (!job) return Response.json({ error: 'No posting with that id.' }, { status: 404 });
 
   const [match, stage] = await Promise.all([
