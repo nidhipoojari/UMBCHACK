@@ -551,3 +551,164 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .ws-timeline li, .ws-facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .ws-board { grid-auto-columns: minmax(78%, 1fr); }
 }
+
+/* ---- Alumni network -------------------------------------------------------
+   The rank bar, the route cards and the agent list. Colours come from the
+   workspace tokens above rather than new ones: this screen is a view of the
+   same workspace, and a second palette would read as a different product. */
+
+.alumni-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  overflow: hidden;
+  margin: 0.75rem 0 0.4rem;
+}
+.alumni-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  /* Width is driven by XP, so it should read as progress being made rather
+     than as a value snapping into place. */
+  transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.alumni-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  margin: 0.5rem 0 0;
+}
+
+.alumni-sub {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.alumni-routes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.alumni-routes li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, currentColor 22%, transparent);
+  /* Undiscovered routes are deliberately quiet: the point is that there is
+     something there to find, not that the student is missing out. */
+  opacity: 0.55;
+}
+.alumni-routes li.is-unlocked {
+  opacity: 1;
+  border-style: solid;
+  border-color: color-mix(in srgb, currentColor 38%, transparent);
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.alumni-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.alumni-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+.alumni-filters select {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  background: transparent;
+  color: inherit;
+}
+
+.alumni-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.alumni-list li {
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  display: grid;
+  gap: 0.5rem;
+}
+.alumni-list li.is-connected {
+  border-color: color-mix(in srgb, currentColor 32%, transparent);
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.alumni-id {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.alumni-id strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92rem;
+}
+
+.alumni-advice {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.alumni-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.alumni-connect {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  border: 0;
+  font: inherit;
+}
+.alumni-connect[disabled] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.spin {
+  animation: alumni-spin 900ms linear infinite;
+}
+@keyframes alumni-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Respect a stated preference for less motion: the spinner and the bar are
+   feedback, and neither needs to move to say what it says. */
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+  .alumni-bar > span {
+    transition: none;
+  }
+}
