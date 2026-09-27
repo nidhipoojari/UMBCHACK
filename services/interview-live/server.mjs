@@ -55,7 +55,11 @@ const DEBUG = process.env.LIVE_DEBUG === "1";
 // The web app's own pages: the live site, its preview channels, and local dev.
 const ORIGINS = new RegExp(
   process.env.ALLOWED_ORIGINS ??
-    "^(https://project-96b6d773-106a-457a-a46(--[a-z0-9-]+)?\\.(web\\.app|firebaseapp\\.com)|http://localhost:3000)$",
+    // The custom domain belongs here too. Without it every WebSocket from
+    // the live site was refused at the upgrade with a bare 403 and no
+    // logged reason: the relay was reachable, public and healthy, and
+    // still would not talk to the only host the product is served from.
+    "^(https://(www\\.)?agenthire\\.biz|https://project-96b6d773-106a-457a-a46(--[a-z0-9-]+)?\\.(web\\.app|firebaseapp\\.com)|http://localhost:3000)$",
 );
 
 const run = promisify(exec);
