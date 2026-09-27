@@ -1473,3 +1473,44 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .alumni-connect::after,
   .mission-button::before { display: none; }
 }
+
+/* ===========================================================================
+   COURSEWORK — the applicant's stand-in transcript on the Profile page
+   =========================================================================== */
+
+.cw-facts { margin: 0 0 6px; font-size: 18px; }
+.cw-note { margin: 0 0 18px; max-width: 70ch; font-size: 15px; line-height: 1.55; }
+.cw-sub { margin: 22px 0 10px; font-size: 16px; font-weight: 400; color: var(--muted); letter-spacing: 0.02em; }
+/* Skills the resume also shows are drawn in full ink; the rest stay muted. */
+.ws-tags li.is-shared { background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--ink); }
+.cw-terms { display: grid; gap: 8px; }
+.cw-term { border-radius: 12px; background: var(--card); padding: 0 16px; }
+.cw-term > summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  cursor: pointer;
+  list-style: none;
+  font-size: 16px;
+}
+.cw-term > summary::-webkit-details-marker { display: none; }
+.cw-term > summary::before { content: '›'; margin-right: 10px; color: var(--muted); transition: transform 0.2s ease; }
+.cw-term[open] > summary::before { transform: rotate(90deg); }
+.cw-term > summary > span:first-of-type { flex: 1; }
+.cw-term ul { list-style: none; margin: 0; padding: 0 0 12px; display: grid; gap: 6px; }
+.cw-term li {
+  display: grid;
+  grid-template-columns: 7ch minmax(0, 1fr) 3ch 5ch;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 15px;
+}
+.cw-code { font-variant-numeric: tabular-nums; color: var(--muted); }
+.cw-title { overflow-wrap: anywhere; }
+.cw-grade { text-align: center; }
+.cw-credits { text-align: right; font-size: 13.5px; }
+@media (max-width: 560px) {
+  .cw-term li { grid-template-columns: minmax(0, 1fr) 3ch; }
+  .cw-code, .cw-credits { display: none; }
+}
