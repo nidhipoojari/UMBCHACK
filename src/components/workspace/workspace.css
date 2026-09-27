@@ -1641,3 +1641,102 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   opacity: 0.85;
 }
 .agent-transcript .agent-bubble { background: color-mix(in srgb, currentColor 5%, transparent); }
+
+/* ---- Match cards ----------------------------------------------------------
+   Three complaints, one block: the rows ran together, nothing carried colour,
+   and only the title was clickable.
+
+   CARD, NOT A ROW. Each match is now a bounded surface with its own padding
+   and a hairline, so the eye gets a boundary instead of counting blank lines.
+   The old rule separated rows with a bottom border, which reads as a table —
+   fine for three columns of numbers, wrong for a block of prose plus tags plus
+   two controls. */
+.ws-list:has(.ws-match) { display: grid; gap: 12px; }
+
+.ws-match {
+  position: relative;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+/* THE WHOLE CARD IS THE LINK, via the title's own anchor rather than a second
+   one. A nested <a> wrapping the card would put two links to the same place in
+   the tab order and read the entire card aloud as one link name; stretching
+   the existing anchor keeps exactly one accessible name and one tab stop. */
+.ws-match h3 a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.ws-match:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 20px rgb(15 23 42 / 6%);
+  transform: translateY(-1px);
+}
+.ws-match:focus-within {
+  border-color: var(--line-strong);
+}
+/* Controls sit above the stretched anchor so they remain separately clickable —
+   without this the save button becomes part of the link. */
+.ws-match > strong,
+.ws-match .vb,
+.ws-match .ws-pill,
+.ws-match .pipeline-save {
+  position: relative;
+  z-index: 1;
+}
+
+/* A LEFT EDGE THAT MEANS SOMETHING. The tint is keyed to eligibility, which is
+   the one fact on the card that changes whether it is worth reading at all —
+   colour spent on anything else would be decoration competing with it. */
+.ws-match::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+/* Eligibility, and ONLY eligibility. An earlier version let a skill gap repaint
+   this amber, which meant an eligible role with one missing skill flew the same
+   flag as a role you may not be allowed to hold — and the gap already says its
+   own piece, in its own amber pill, two lines below. One signal, one meaning. */
+.ws-match:has(.ws-pill--solid)::before { background: #1d9a6c; }
+.ws-match:has(.ws-pill:not(.ws-pill--solid))::before { background: #d08a3a; }
+
+/* Skill tags: the ones you have read as earned, the gap reads as a caution.
+   Both were grey before, which made "you have these six" and "you lack this
+   one" the same weight. */
+.ws-match .ws-tags li {
+  background: color-mix(in srgb, #1d9a6c 9%, transparent);
+  border-color: color-mix(in srgb, #1d9a6c 26%, transparent);
+}
+.ws-match__gap {
+  color: #a4632a !important;
+  background: color-mix(in srgb, #d08a3a 9%, transparent);
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: inline-block;
+}
+
+/* The fit score is the number people scan for; it was the same weight as the
+   body copy beside it. */
+.ws-match > strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  .ws-match:hover { box-shadow: 0 6px 20px rgb(0 0 0 / 30%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-match { transition: none; }
+  .ws-match:hover { transform: none; }
+}

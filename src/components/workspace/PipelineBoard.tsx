@@ -17,6 +17,7 @@ import {
 
 import { StartInterviewButton, offersInterview } from './StartInterviewButton';
 import './pipeline.css';
+import { toJobSlug } from '@/lib/job-slug';
 
 function cardName(card: PipelineCard): string {
   const title = card.title ?? 'Untitled role';
@@ -213,7 +214,7 @@ function Card({
   return (
     <li className="pipe-card">
       <p className="pipe-card-title">
-        <Link href={`/applicant/jobs/${encodeURIComponent(card.job_id)}`}>
+        <Link href={`/applicant/jobs/${toJobSlug(card.job_id)}`}>
           {card.title ?? 'Untitled role'}
           <span className="sr-only"> at {company}, open this role</span>
         </Link>

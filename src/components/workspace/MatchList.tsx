@@ -25,6 +25,7 @@ import { SavePipelineButton } from './SavePipelineButton';
 
 import { Stats } from './PageHead';
 import { useMatches } from './useMatches';
+import { toJobSlug } from '@/lib/job-slug';
 
 const fit = (m: JobMatch) => `${Math.round(m.score * 100)}`;
 
@@ -81,7 +82,7 @@ function MatchRow({ match, stage }: { match: JobMatch; stage: PipelineStatus | n
     <li className="ws-row ws-match">
       <div>
         <h3>
-          <Link href={`/applicant/jobs/${encodeURIComponent(match.job_id)}`}>
+          <Link href={`/applicant/jobs/${toJobSlug(match.job_id)}`}>
             {match.title}
             <ArrowRight size={15} aria-hidden="true" />
             <span className="sr-only"> (open this role, save it or autofill the application)</span>
