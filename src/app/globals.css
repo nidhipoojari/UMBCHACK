@@ -538,13 +538,16 @@ main, [id] { scroll-margin-top: 100px; }
 /* The card is the bordered box; the caption sits outside and below it. */
 .stage__card {
   order: 1;
-  height: min(60vh, 560px);
+  /* A cap, not a fixed height: the frame keeps its 3:2 shape (set with the
+     story-card styles below) until the band is too short, then gives up height
+     and the drawing scales down inside it instead of spilling out. No padding
+     here — .stage__art carries it, and two layers of padding squeezed the
+     drawing twice. */
+  max-height: min(60vh, 560px);
   flex: 0 1 auto;
   min-height: 0;
-  padding: 38px 36px;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
   transition: border-color 0.25s ease;
 }
 .stage:hover .stage__card { box-shadow: var(--glow); }
@@ -576,11 +579,11 @@ main, [id] { scroll-margin-top: 100px; }
 .rail__stack { display: grid; gap: 0; }
 .rail--static .rail__stack { gap: 20px; }
 .rail--static .stage { flex: none; max-height: none; }
-.rail--static .stage__card { height: auto; padding: 32px 30px; overflow: visible; }
+.rail--static .stage__card { max-height: none; }
 
 @media (max-width: 760px) {
   .stage { flex: 0 0 84vw; }
-  .stage__card { height: min(64vh, 520px); padding: 28px 24px; }
+  .stage__card { max-height: min(64vh, 520px); }
   .rail__head { flex-wrap: wrap; gap: 10px 20px; padding-top: 22px; }
   .rail__beat { order: -1; width: 100%; }
 }
@@ -964,12 +967,23 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
 /* Every drawing is `currentColor` throughout, so one declaration here colours
    every stroke and fill inside it. */
 .stage__art {
+  position: relative;
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
   color: var(--ink);
-  padding: 26px 30px;
+}
+
+/* The drawing is pinned to the card's padded box and scaled to FIT it (the
+   SVG's default preserveAspectRatio letterboxes). Left in normal flow, a 3:2
+   drawing at full card width came out taller than the card whenever the card
+   was shorter than 3:2, and overflow: hidden clipped its bottom off. The face
+   on beat 05 is a fixed 330px square, so it gets the same treatment. */
+.stage__art > svg {
+  position: absolute;
+  inset: 26px 30px;
+  width: calc(100% - 60px);
+  height: calc(100% - 52px);
 }
 
 .art { width: 100%; height: 100%; display: block; overflow: visible; }
