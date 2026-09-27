@@ -51,9 +51,39 @@ Two rules shaped every decision:
 | **DoIT: Navigating the Future: Career Pathways & Degree ROI** | The hackUMBC alumni and campus dataset loaded into Postgres; a **coursework twin** for every applicant (one dataset student's transcript, matched to their resume, shown on Profile and counted when real job postings are ranked); an alumni network built on it; and a spoken **gap interview** that compares the student's skills and coursework with what real postings ask for |
 | **CyberDawgs Cybersecurity Application** | The A2A gateway: ES256-signed envelopes, ECDH + AES-256-GCM sealing, replay protection, a trust index and an offline attack battery. *Requires the extensive documentation in the [trust protocol](#-the-agent-to-agent-trust-protocol) section and `functions/README.md`* |
 | **Best Entrepreneurial Idea** | A two-sided product for students and employers, where verified identity is the moat |
+| **STARS: Community Impact & Social Innovation** | Built for UMBC students and the Baltimore-area employers who hire them: introductions to alumni who already got the job, protection from fake postings, and skills from coursework that resumes leave out. See [community impact](#-community-impact-umbc--baltimore) for the need, the impact and how we would measure it |
 | **Most Engaging Demo** | Tap the agent's face and it introduces itself out loud, then watch it refuse an employer that cannot prove who it is |
 | **MLH: Best Use of Gemini API** | Gemini runs the resume extraction, the enrichers, match reranking, document drafting, autofill planning and the agent's tool loop |
 | **MLH: Best Use of ElevenLabs** | agentHire's voice: a saved intro clip on the landing page, and a spoken **gap interview** on the Jobs page that asks about missing skills and hears the answers (Scribe speech-to-text + Flash text-to-speech) |
+
+---
+
+## 🤝 Community impact (UMBC & Baltimore)
+
+**The need.** A job search is hardest for the students with the fewest connections: those who are the first in their family to go to college, who commute, or who work while studying, and don't know anyone who already has the job they want. The same students lose the most to fake postings that exist only to collect a resume, a phone number or an ID, and to hours of retyping the same application on site after site. Employers in the Baltimore area, meanwhile, have trouble telling real applicants from mass-generated ones.
+
+**What agentHire does about it**, using what's built today:
+
+| Community need | What the student gets |
+|---|---|
+| No one to ask | The **alumni network** introduces them to UMBC alumni from their major who already got there, and the agent makes the introduction |
+| Fake postings and data harvesting | The agent **verifies every employer first** and releases nothing to one that can't prove who it is |
+| Skills a resume leaves out | The **coursework twin** and the spoken **gap interview** bring out what they learned in class and outside it, and re-rank their matches |
+| Hours of repetitive forms | **Autofill** and drafted materials, always approved by the student before anything is sent |
+| Different ways of working | **Voice first**, with a typed option for every step, keyboard reachable, with captions for everything the agent says |
+
+**Measuring it.** Most of what matters is already recorded by the app, so a pilot can be measured without new tracking:
+
+| Outcome | How we would measure it | Recorded in |
+|---|---|---|
+| Students reach people who can help | Alumni introductions made, and questions asked, per student | `alumni_connections` |
+| Students apply sooner and more often | Time from sign-up to first application, applications per student per week | `application_events` |
+| Applications turn into interviews | Share of applications that reach the interviewing stage | `application_events` |
+| Students are protected from fake employers | Employers refused, and why, before any data left the student | `a2a_audit` |
+| Hidden skills come to light | Skills confirmed in the gap interview, and how far the affected matches moved | `profile_gaps`, `job_matches` |
+| Students feel more confident | A short survey at sign-up and after four weeks | Opt-in survey |
+
+**A realistic pilot.** One semester with an opt-in cohort recruited through the UMBC Career Center and student organizations, measured against the same students' starting point. Results are reported in aggregate only, and anything that separates first-generation or commuter students comes from the opt-in survey, never inferred. The next step is Baltimore-area employers joining as verified employers, then other University System of Maryland campuses.
 
 ---
 
@@ -416,6 +446,7 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 
 | When (EDT) | What changed |
 |---|---|
+| Sun Sep 27, ~05:15 | README: community impact section for the STARS track (the need, what agentHire does about it, and how a UMBC pilot would measure it from data the app already records); tracks and features described as they work today |
 | Sun Sep 27, ~04:15 | Coursework twin: every applicant matched once to a unique hackUMBC dataset student during resume processing, a Coursework card on Profile, and coursework counted as partial evidence in the gap interview's re-ranking (`coursework_twins`, `009`); apply moved into agent missions |
 | Sun Sep 27, ~03:35 | Landing page speaks to students: two new "Built for students" beats in How it works (alumni network, streaks and XP), student card and feature marquee updated |
 | Sun Sep 27, ~02:45 | Gap interview on the Jobs page (spoken or typed, capped re-scoring of affected matches); alumni network and Agents tab revamped as missions with a secure agent line; avatar initials back in Forum |
