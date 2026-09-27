@@ -38,8 +38,11 @@ registerProcessor('capture', Capture);
 `;
 
 type Handlers = {
-  /** A piece of what the candidate said, as the relay transcribes it. */
-  onHeard: (text: string) => void;
+  /**
+   * What the candidate said, as the relay transcribes it. `finished` is set when
+   * Gemini decides they have stopped talking: the end of their answer.
+   */
+  onHeard: (text: string, finished: boolean) => void;
   /** A status sentence for the room's live region. */
   onNotice: (text: string | null) => void;
 };
@@ -210,12 +213,12 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
         ws.onopen = () => ws.send(JSON.stringify({ type: 'start', ticket: pass.ticket, index }));
         ws.onmessage = (event: MessageEvent<ArrayBuffer | string>) => {
           if (typeof event.data !== 'string') return play(event.data);
-          const message = JSON.parse(event.data) as { type: string; text?: string; message?: string };
+          const message = JSON.parse(event.data) as { type: string; text?: string; finished?: boolean; message?: string };
           if (message.type === 'ready') {
             setStatus('live');
             handlers.current.onNotice('The interviewer is on the line. Answer out loud; your words appear in the answer box.');
-          } else if (message.type === 'heard' && message.text) {
-            handlers.current.onHeard(message.text);
+          } else if (message.type === 'heard') {
+            handlers.current.onHeard(message.text ?? '', !!message.finished);
           } else if (message.type === 'interrupted') {
             silence();
           } else if (message.type === 'error' && message.message) {
@@ -270,6 +273,9 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
     return span;
   }, []);
 
+  /** When the microphone last heard a voice (performance.now()), or null. */
+  const lastVoiceAt = useCallback((): number | null => live.current.lastVoice, []);
+
   /** The interviewer's output spectrum, for the wave. Empty when not connected. */
   const levels = useCallback((): Uint8Array => {
     const analyser = live.current.analyser;
@@ -295,7 +301,7 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
     };
   }, [teardown]);
 
-  return { status, speaking, start, ask, repeat, end, stop, levels, takeSpeechSeconds };
+  return { status, speaking, start, ask, repeat, end, stop, levels, takeSpeechSeconds, lastVoiceAt };
 }
 
 /** Columns and rows of the pixel wave. */

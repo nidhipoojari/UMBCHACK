@@ -21,15 +21,25 @@ import './interview.css';
 
 type Phase = 'brief' | 'live' | 'done';
 
+/** How long a finished spoken answer waits before it sends, so the candidate can keep going. */
+const GRACE_MS = 2500;
+/** Quiet this long after speaking ends a recording (when there is no live call). */
+const RECORDING_SILENCE_MS = 2500;
+
 /**
- * The mock interview room. One question at a time; answers are typed, or
- * recorded and transcribed by Gemini, then critiqued as they go and summed up
- * in a readout at the end. The interviewer can read each question aloud with a
- * Gemini voice.
+ * The mock interview room, hands-free. Starting the interview brings in the
+ * live interviewer, a two-way voice call with Gemini that asks each question.
+ * When the candidate stops talking, their words land in the answer box and are
+ * sent after a short grace period; speaking again, typing, or "Wait, I'm not
+ * done" holds it. The critique of each answer builds up underneath, and the
+ * readout comes at the end.
  *
- * The camera and microphone never open by themselves: each has a button, and
- * refusing either leaves a working typed interview. Video is a self-view only
- * and is never recorded or uploaded; audio is uploaded only to be transcribed.
+ * Without a live call (not set up, blocked, or hung up), the questions are read
+ * aloud instead, and "Record answer" stops by itself on silence and is
+ * transcribed by Gemini. Typing works throughout.
+ *
+ * The camera never opens by itself and is a self-view only: it is never
+ * recorded or uploaded.
  */
 export function InterviewRoom({ jobId }: { jobId: string }) {
   const [session, setSession] = useState<InterviewSessionPayload | null>(null);
@@ -37,7 +47,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
   const [phase, setPhase] = useState<Phase>('brief');
   const [index, setIndex] = useState(0);
 
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftState] = useState('');
   const [answers, setAnswers] = useState<InterviewAnswer[]>([]);
   const [critiques, setCritiques] = useState<AnswerCritique[]>([]);
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
@@ -47,16 +57,43 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-
-  const [readAloud, setReadAloud] = useState(true);
   const [speaking, setSpeaking] = useState(false);
 
-  // What the candidate says on a live call goes straight into the answer box.
-  const heardRef = useRef(false);
-  const onHeard = useCallback((text: string) => {
-    heardRef.current = true;
-    setDraft((current) => (current + text).replace(/^\s+/, ''));
+  /** When a finished spoken answer sends by itself (Date.now()), or null. */
+  const [autoSendAt, setAutoSendAt] = useState<number | null>(null);
+  const [clock, setClock] = useState(0);
+
+  // The draft is read from timers and audio callbacks, so it lives in a ref too.
+  const draftRef = useRef('');
+  const setDraft = useCallback((value: string) => {
+    draftRef.current = value;
+    setDraftState(value);
   }, []);
+  /** Whether the current draft came, at least partly, from speech. */
+  const spokeRef = useRef(false);
+  const scheduledAtRef = useRef(0);
+
+  const scheduleAutoSend = useCallback(() => {
+    if (!draftRef.current.trim()) return;
+    scheduledAtRef.current = performance.now();
+    setAutoSendAt(Date.now() + GRACE_MS);
+    setClock(Date.now());
+    setNotice('Got it. Your answer sends in a moment; keep talking to add more.');
+  }, []);
+  const holdAutoSend = useCallback(() => setAutoSendAt(null), []);
+
+  const onHeard = useCallback(
+    (text: string, finished: boolean) => {
+      if (text) {
+        spokeRef.current = true;
+        setDraft((draftRef.current + text).replace(/^\s+/, ''));
+        // Still talking: whatever was about to send waits for the end of this.
+        if (!finished) setAutoSendAt(null);
+      }
+      if (finished) scheduleAutoSend();
+    },
+    [scheduleAutoSend, setDraft],
+  );
   const liveCall = useLiveInterviewer(jobId, session?.sessionId ?? '', { onHeard, onNotice: setNotice });
   const liveOn = liveCall.status === 'live' || liveCall.status === 'connecting';
 
@@ -66,14 +103,18 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
   const micStreamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  /** The voice meter for the current recording; see startLevelMeter. */
   const meterRef = useRef<LevelMeter | null>(null);
   const answerBoxRef = useRef<HTMLTextAreaElement | null>(null);
-  /** Carried from the recording to the send, so pace is measured on speech only. */
+  /** Seconds of speech in the current draft, so pace is measured on speech only. */
   const spokenSecondsRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   /** Spoken questions by id, so a replay does not synthesize again. */
   const speechCache = useRef(new Map<string, Promise<string | null>>());
+  /** Once the candidate has recorded one answer, later questions record by themselves. */
+  const autoRecordRef = useRef(false);
+  const startRecordingRef = useRef<() => Promise<void>>(async () => {});
+  const stopRecordingRef = useRef<() => Promise<void>>(async () => {});
+  const sendRef = useRef<(skip: boolean) => Promise<void>>(async () => {});
 
   /* ------------------------------------------------------------- the session */
 
@@ -108,7 +149,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
     };
   }, [jobId]);
 
-  /* ------------------------------------------------- camera and microphone */
+  /* ---------------------------------------------------------------- the camera */
 
   const stopCamera = useCallback(() => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -150,6 +191,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
       stopCamera();
       meterRef.current?.stop();
       meterRef.current = null;
+      if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
       micStreamRef.current?.getTracks().forEach((track) => track.stop());
       micStreamRef.current = null;
       audioRef.current?.pause();
@@ -165,7 +207,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
     };
   }, [stopCamera]);
 
-  /* ------------------------------------------------------- the interviewer */
+  /* ----------------------------------------- the interviewer, without a live call */
 
   const question: InterviewQuestion | null = session?.questions[index] ?? null;
 
@@ -210,37 +252,97 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
       audio.onended = () => {
         setSpeaking(false);
         setNotice(null);
+        // After the first recorded answer, the next ones start recording as soon as the question ends.
+        if (autoRecordRef.current) void startRecordingRef.current();
       };
       try {
         await audio.play();
       } catch {
         setSpeaking(false);
-        setNotice('The browser blocked audio playback. Press "Read it aloud" to hear the question.');
+        setNotice('The browser blocked audio playback. Press "Read it again" to hear the question.');
       }
     },
     [speechFor],
   );
 
-  // Read each new question aloud when that is on, and fetch the next one's
-  // audio in the background so it is ready when this one is answered. The
-  // first question's audio is fetched while the briefing is still on screen.
+  // Without a live call, each new question is read aloud, and the next one's
+  // audio is fetched in the background so it is ready in time.
   const spokenFor = useRef<string | null>(null);
   useEffect(() => {
-    // On a live call the interviewer asks the questions itself.
-    if (!question || !session?.voiceReady || liveOn) return;
-    if (phase === 'brief' && readAloud) void speechFor(question.id);
+    if (!question || !session?.voiceReady) return;
+    if (liveOn) {
+      // The live interviewer asked this one; do not read it again after a hang-up.
+      spokenFor.current = question.id;
+      return;
+    }
+    if (phase === 'brief' && !session.liveReady) void speechFor(question.id);
     if (phase !== 'live') return;
     const next = session.questions[index + 1];
     if (next) void speechFor(next.id);
-    if (!readAloud || spokenFor.current === question.id) return;
+    if (spokenFor.current === question.id) return;
     spokenFor.current = question.id;
     void speak(question);
-  }, [index, liveOn, phase, question, readAloud, session, speak, speechFor]);
+  }, [index, liveOn, phase, question, session, speak, speechFor]);
 
   /* ----------------------------------------------------------- the recording */
 
+  const stopRecording = useCallback(async () => {
+    const recorder = recorderRef.current;
+    if (!recorder || !session) return;
+    recorderRef.current = null;
+    const speechSeconds = meterRef.current?.stop() ?? 0;
+    meterRef.current = null;
+
+    const stopped = new Promise<void>((resolve) => {
+      recorder.onstop = () => resolve();
+    });
+    recorder.stop();
+    await stopped;
+    setRecording(false);
+
+    const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+    chunksRef.current = [];
+    // Nothing is sent when the microphone heard no voice: given silence, the
+    // model writes a sentence nobody said.
+    if (blob.size === 0 || speechSeconds < 0.5) {
+      setNotice('We heard nothing in that recording. Check your microphone, then try again or type the answer.');
+      return;
+    }
+
+    setBusy('Transcribing your answer.');
+    try {
+      const form = new FormData();
+      form.append('audio', blob, 'answer');
+      form.append('speech_seconds', speechSeconds.toFixed(2));
+      const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/transcribe`, {
+        method: 'POST',
+        body: form,
+      });
+      const payload = (await response.json()) as { ok?: boolean; text?: string; reason?: string; error?: string };
+      if (!payload.ok) {
+        setNotice(payload.reason ?? payload.error ?? 'That recording could not be transcribed.');
+        return;
+      }
+      if (!payload.text) {
+        setNotice('We heard nothing in that recording. Try again, or type the answer.');
+        return;
+      }
+      setDraft(draftRef.current.trim() ? `${draftRef.current.trim()} ${payload.text}` : payload.text);
+      spokeRef.current = true;
+      spokenSecondsRef.current = (spokenSecondsRef.current ?? 0) + speechSeconds;
+      setBusy(null);
+      scheduleAutoSend();
+    } catch (error) {
+      setNotice((error as Error).message);
+    } finally {
+      setBusy((current) => (current === 'Transcribing your answer.' ? null : current));
+    }
+  }, [jobId, scheduleAutoSend, session, setDraft]);
+
   const startRecording = useCallback(async () => {
+    if (recorderRef.current) return;
     stopAudio();
+    setAutoSendAt(null);
     let stream = micStreamRef.current;
     if (!stream) {
       try {
@@ -266,123 +368,82 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
     };
     recorder.start();
     recorderRef.current = recorder;
-    meterRef.current = startLevelMeter(stream);
+    autoRecordRef.current = true;
+    meterRef.current = startLevelMeter(stream, {
+      silenceMs: RECORDING_SILENCE_MS,
+      onSilence: () => void stopRecordingRef.current(),
+    });
     setRecording(true);
-    setNotice('Recording your answer. Press stop when you are done.');
+    setNotice('Listening. Answer out loud; it stops by itself when you finish.');
   }, [stopAudio]);
 
-  const stopRecording = useCallback(async () => {
-    const recorder = recorderRef.current;
-    if (!recorder || !session) return;
-    const speechSeconds = meterRef.current?.stop() ?? 0;
-    meterRef.current = null;
-
-    const stopped = new Promise<void>((resolve) => {
-      recorder.onstop = () => resolve();
-    });
-    recorder.stop();
-    await stopped;
-    recorderRef.current = null;
-    setRecording(false);
-
-    const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
-    chunksRef.current = [];
-    if (blob.size === 0) {
-      setNotice('That recording came back empty. Type the answer instead.');
-      return;
-    }
-    // Nothing is sent when the microphone heard no voice: given silence, the
-    // model writes a sentence nobody said.
-    if (speechSeconds < 0.5) {
-      setNotice('We heard nothing in that recording. Check your microphone, then try again or type the answer.');
-      return;
-    }
-
-    setBusy('Transcribing your answer.');
-    try {
-      const form = new FormData();
-      form.append('audio', blob, 'answer');
-      form.append('speech_seconds', speechSeconds.toFixed(2));
-      const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/transcribe`, {
-        method: 'POST',
-        body: form,
-      });
-      const payload = (await response.json()) as {
-        ok?: boolean;
-        text?: string;
-        seconds?: number | null;
-        reason?: string;
-        error?: string;
-      };
-      if (!payload.ok) {
-        setNotice(payload.reason ?? payload.error ?? 'That recording could not be transcribed.');
-        return;
-      }
-      if (!payload.text) {
-        setNotice('We heard nothing in that recording. Try again, or type the answer.');
-        return;
-      }
-      setDraft((current) => (current.trim() ? `${current.trim()} ${payload.text}` : payload.text!));
-      // Pace is measured over the speech itself, first word to last, not over
-      // how long the record button was held.
-      spokenSecondsRef.current = (spokenSecondsRef.current ?? 0) + speechSeconds;
-      setNotice('Transcribed. Read it, fix anything it misheard, then send it.');
-      answerBoxRef.current?.focus();
-    } catch (error) {
-      setNotice((error as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  }, [jobId, session]);
+  useEffect(() => {
+    startRecordingRef.current = startRecording;
+    stopRecordingRef.current = stopRecording;
+  }, [startRecording, stopRecording]);
 
   /* ------------------------------------------------------------- the answers */
 
-  const finish = useCallback(async (allAnswers: InterviewAnswer[]) => {
-    if (!session) return;
-    setBusy('Writing your readout.');
-    try {
-      const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/finish`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sessionId: session.sessionId, answers: allAnswers }),
-      });
-      const payload = (await response.json()) as { feedback?: InterviewFeedback; error?: string };
-      if (!response.ok || !payload.feedback) {
-        setNotice(payload.error ?? `The readout could not be written (${response.status}).`);
-        return;
+  const finish = useCallback(
+    async (allAnswers: InterviewAnswer[]) => {
+      if (!session) return;
+      setBusy('Writing your readout.');
+      try {
+        const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/finish`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ sessionId: session.sessionId, answers: allAnswers }),
+        });
+        const payload = (await response.json()) as { feedback?: InterviewFeedback; error?: string };
+        if (!response.ok || !payload.feedback) {
+          setNotice(payload.error ?? `The readout could not be written (${response.status}).`);
+          return;
+        }
+        setFeedback(payload.feedback);
+        setPhase('done');
+        stopCamera();
+      } catch (error) {
+        setNotice((error as Error).message);
+      } finally {
+        setBusy(null);
       }
-      setFeedback(payload.feedback);
-      setPhase('done');
-      stopCamera();
-    } catch (error) {
-      setNotice((error as Error).message);
-    } finally {
-      setBusy(null);
-    }
-  }, [jobId, session, stopCamera]);
+    },
+    [jobId, session, stopCamera],
+  );
 
   const send = useCallback(
     async (skip: boolean) => {
       if (!session || !question) return;
-      const text = skip ? '' : draft.trim();
+      setAutoSendAt(null);
+      const text = skip ? '' : draftRef.current.trim();
       if (!skip && !text) {
         setNotice('Nothing in the answer box yet.');
         return;
       }
+      if (recorderRef.current) {
+        meterRef.current?.stop();
+        meterRef.current = null;
+        recorderRef.current.stop();
+        recorderRef.current = null;
+        setRecording(false);
+      }
 
       stopAudio();
       setBusy(skip ? 'Skipping.' : 'Sending your answer.');
-      // On a live call, pace comes from the microphone meter while they spoke.
       const liveSeconds = liveOn ? liveCall.takeSpeechSeconds() : 0;
       const spokenSeconds = skip
         ? null
-        : liveOn && heardRef.current && liveSeconds > 0
-          ? liveSeconds
-          : spokenSecondsRef.current;
+        : !spokeRef.current
+          ? null
+          : liveOn
+            ? liveSeconds > 0
+              ? liveSeconds
+              : null
+            : spokenSecondsRef.current;
       const answer: InterviewAnswer = {
         questionId: question.id,
         text,
-        source: spokenSeconds !== null ? 'spoken' : 'typed',
+        source: spokeRef.current && !skip ? 'spoken' : 'typed',
         spokenSeconds,
       };
 
@@ -408,7 +469,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
         setCritiques((previous) => [...previous, payload.critique as AnswerCritique]);
         setDraft('');
         spokenSecondsRef.current = null;
-        heardRef.current = false;
+        spokeRef.current = false;
         setNotice(null);
         setIndex((previous) => previous + 1);
         const last = index + 1 >= session.questions.length;
@@ -417,17 +478,55 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
           if (last) liveCall.end();
           else liveCall.ask(index + 1);
         }
-        // The last answer ends the interview; no button to find.
         if (last) await finish(allAnswers);
       } catch (error) {
         setNotice((error as Error).message);
       } finally {
-        setBusy(null);
+        setBusy((current) => (current === 'Writing your readout.' ? current : null));
       }
     },
-    [answers, draft, finish, index, jobId, liveCall, liveOn, question, session, stopAudio],
+    [answers, finish, index, jobId, liveCall, liveOn, question, session, setDraft, stopAudio],
   );
 
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
+
+  // A finished spoken answer sends itself after the grace period, unless the
+  // candidate started talking again in the meantime. Only stable values are
+  // dependencies, so the countdown's own re-renders do not restart the timer.
+  const lastVoiceAt = liveCall.lastVoiceAt;
+  const liveOnRef = useRef(liveOn);
+  useEffect(() => {
+    liveOnRef.current = liveOn;
+  }, [liveOn]);
+  useEffect(() => {
+    if (autoSendAt === null) return;
+    const tick = window.setInterval(() => setClock(Date.now()), 250);
+    const fire = window.setTimeout(
+      () => {
+        const voice = lastVoiceAt();
+        if (liveOnRef.current && voice !== null && voice > scheduledAtRef.current + 300) {
+          setAutoSendAt(null);
+          setNotice('Still listening.');
+          return;
+        }
+        void sendRef.current(false);
+      },
+      Math.max(0, autoSendAt - Date.now()),
+    );
+    return () => {
+      window.clearInterval(tick);
+      window.clearTimeout(fire);
+    };
+  }, [autoSendAt, lastVoiceAt]);
+
+  const startInterview = useCallback(() => {
+    if (!session) return;
+    setPhase('live');
+    // Started from the click, so the browser lets the call open the microphone and play audio.
+    if (session.liveReady) void liveCall.start(0);
+  }, [liveCall, session]);
 
   /* -------------------------------------------------------------- rendering */
 
@@ -494,6 +593,8 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
     );
   }
 
+  const secondsLeft = autoSendAt === null ? 0 : Math.max(0, Math.ceil((autoSendAt - clock) / 1000));
+
   return (
     <>
       {back}
@@ -525,49 +626,45 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
             )}
             {cameraError ? <p className="iv-warn">{cameraError}</p> : null}
 
-            {session.voiceReady || session.liveReady ? (
+            {session.liveReady || session.voiceReady ? (
               <section className="iv-voice" aria-labelledby="iv-voice-heading">
                 <h3 id="iv-voice-heading" className="iv-h3">
                   Interviewer
                 </h3>
-                {session.liveReady ? (
-                  <>
-                    <PixelWave active={liveCall.status === 'live'} read={liveCall.levels} />
-                    <p className="iv-muted iv-small">
-                      {liveCall.status === 'live'
-                        ? liveCall.speaking
-                          ? 'The interviewer is speaking. Talk over them and they will stop.'
-                          : 'The interviewer is listening.'
-                        : liveCall.status === 'connecting'
-                          ? 'Connecting the interviewer.'
-                          : 'A live voice call with Gemini: the interviewer asks each question and hears your answer.'}
-                    </p>
-                    {liveOn ? (
-                      <button type="button" className="ws-button ws-button--quiet iv-voice-button" onClick={liveCall.stop}>
-                        Hang up
-                      </button>
-                    ) : phase === 'live' && question ? (
-                      <button
-                        type="button"
-                        className="ws-button iv-voice-button"
-                        onClick={() => {
-                          stopAudio();
-                          liveCall.takeSpeechSeconds();
-                          void liveCall.start(index);
-                        }}
-                      >
-                        {liveCall.status === 'idle' ? 'Talk to the interviewer live' : 'Call the interviewer again'}
-                      </button>
-                    ) : phase === 'brief' ? (
-                      <p className="iv-muted iv-small">Start the interview, then call the interviewer.</p>
-                    ) : null}
-                  </>
-                ) : null}
-                {session.voiceReady && !liveOn ? (
-                  <label className="iv-toggle">
-                    <input type="checkbox" checked={readAloud} onChange={(event) => setReadAloud(event.target.checked)} />
-                    {session.liveReady ? 'Without a live call, read each question aloud' : 'Read each question aloud'}
-                  </label>
+                {session.liveReady ? <PixelWave active={liveCall.status === 'live'} read={liveCall.levels} /> : null}
+                <p className="iv-muted iv-small">
+                  {liveCall.status === 'live'
+                    ? liveCall.speaking
+                      ? 'Speaking. Talk over them and they will stop.'
+                      : 'Listening.'
+                    : liveCall.status === 'connecting'
+                      ? 'Connecting.'
+                      : phase === 'brief'
+                        ? session.liveReady
+                          ? 'Calls in when you start, on a live voice call with Gemini.'
+                          : 'Reads each question aloud with a Gemini voice.'
+                        : speaking
+                          ? 'Reading the question.'
+                          : 'Not on a live call. Questions are read aloud instead.'}
+                </p>
+                {phase === 'live' && session.liveReady ? (
+                  liveOn ? (
+                    <button type="button" className="ws-button ws-button--quiet iv-voice-button" onClick={liveCall.stop}>
+                      Hang up
+                    </button>
+                  ) : question ? (
+                    <button
+                      type="button"
+                      className="ws-button ws-button--quiet iv-voice-button"
+                      onClick={() => {
+                        stopAudio();
+                        liveCall.takeSpeechSeconds();
+                        void liveCall.start(index);
+                      }}
+                    >
+                      Call the interviewer back
+                    </button>
+                  ) : null
                 ) : null}
               </section>
             ) : null}
@@ -578,7 +675,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
               {phase === 'done' ? 'How it went' : 'Interview'}
             </h2>
 
-            {phase === 'brief' ? <Brief session={session} onStart={() => setPhase('live')} /> : null}
+            {phase === 'brief' ? <Brief session={session} onStart={startInterview} /> : null}
 
             {phase === 'live' && question ? (
               <>
@@ -609,56 +706,86 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
                   className="iv-answer"
                   rows={8}
                   value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
+                  onChange={(event) => {
+                    // Typing holds an automatic send: they are editing.
+                    holdAutoSend();
+                    setDraft(event.target.value);
+                  }}
                   placeholder={
                     liveOn
-                      ? 'Answer out loud and your words appear here. Edit anything misheard, then send.'
-                      : 'Type it, or record it and edit what comes back.'
+                      ? 'Answer out loud. Your words appear here, and send by themselves when you stop talking.'
+                      : 'Type your answer, or record it.'
                   }
                 />
 
                 <div className="iv-actions">
-                  <button type="button" className="ws-button" disabled={busy !== null || recording} onClick={() => void send(false)}>
-                    Send answer
+                  <button
+                    type="button"
+                    className="ws-button"
+                    disabled={busy !== null || !draft.trim()}
+                    onClick={() => void send(false)}
+                  >
+                    {autoSendAt !== null ? (
+                      <>
+                        Send now <span aria-hidden="true">· {secondsLeft}</span>
+                      </>
+                    ) : (
+                      'Send answer'
+                    )}
                   </button>
-                  {liveOn ? null : recording ? (
-                    <button type="button" className="ws-button ws-button--quiet iv-recording" onClick={() => void stopRecording()}>
-                      Stop recording
-                    </button>
-                  ) : (
+                  {autoSendAt !== null ? (
                     <button
                       type="button"
                       className="ws-button ws-button--quiet"
-                      disabled={busy !== null}
-                      onClick={() => void startRecording()}
+                      onClick={() => {
+                        holdAutoSend();
+                        setNotice('Held. Keep going, then send when you are ready.');
+                        answerBoxRef.current?.focus();
+                      }}
                     >
-                      Record answer
+                      Wait, I&apos;m not done
                     </button>
-                  )}
+                  ) : null}
                   {liveCall.status === 'live' ? (
                     <button type="button" className="ws-button ws-button--quiet" onClick={() => liveCall.repeat(index)}>
                       Ask it again
                     </button>
-                  ) : session.voiceReady ? (
-                    speaking ? (
-                      <button type="button" className="ws-button ws-button--quiet" onClick={stopAudio}>
-                        Stop reading
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        className="ws-button ws-button--quiet"
-                        disabled={recording}
-                        onClick={() => void speak(question)}
-                      >
-                        Read it aloud
-                      </button>
-                    )
-                  ) : null}
+                  ) : liveOn ? null : (
+                    <>
+                      {recording ? (
+                        <button
+                          type="button"
+                          className="ws-button ws-button--quiet iv-recording"
+                          onClick={() => void stopRecording()}
+                        >
+                          Stop recording
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="ws-button ws-button--quiet"
+                          disabled={busy !== null}
+                          onClick={() => void startRecording()}
+                        >
+                          Record answer
+                        </button>
+                      )}
+                      {session.voiceReady ? (
+                        <button
+                          type="button"
+                          className="ws-button ws-button--quiet"
+                          disabled={recording || speaking}
+                          onClick={() => void speak(question)}
+                        >
+                          Read it again
+                        </button>
+                      ) : null}
+                    </>
+                  )}
                   <button
                     type="button"
                     className="ws-button ws-button--quiet"
-                    disabled={busy !== null || recording}
+                    disabled={busy !== null}
                     onClick={() => void send(true)}
                   >
                     Skip this one
@@ -681,8 +808,11 @@ function Brief({ session, onStart }: { session: InterviewSessionPayload; onStart
   return (
     <>
       <p>
-        {session.questions.length} questions, one at a time. Answer them out loud if you can: speaking an answer is the
-        part nobody rehearses. You can skip any of them, and skipping shows up in the readout.
+        {session.questions.length} questions, one at a time.{' '}
+        {session.liveReady
+          ? 'The interviewer calls in and asks each one out loud. Answer out loud: when you stop talking, your answer is sent and the next question comes.'
+          : 'Each question is read aloud. Record your answer and it stops by itself when you finish, or type it.'}{' '}
+        You can type instead at any point, and skipping shows up in the readout.
       </p>
       <p className="iv-muted">{QUESTION_SOURCE_LABEL[session.questionSource]}.</p>
 
@@ -697,6 +827,7 @@ function Brief({ session, onStart }: { session: InterviewSessionPayload; onStart
       <button type="button" className="ws-button" onClick={onStart}>
         Start the interview
       </button>
+      {session.liveReady ? <p className="iv-muted iv-small">Your browser will ask for the microphone.</p> : null}
     </>
   );
 }
@@ -757,12 +888,16 @@ function Readout({ feedback, questions }: { feedback: InterviewFeedback; questio
 type LevelMeter = { stop: () => number };
 
 /**
- * Watches the microphone level while recording and returns, on stop, the
- * seconds from the first moment of voice to the last. Zero means no voice was
+ * Watches the microphone level while recording. `onSilence` fires once, after
+ * voice has been heard and then `silenceMs` of quiet. `stop()` returns the
+ * seconds from the first moment of voice to the last; zero means no voice was
  * heard at all. The threshold rises with the room's own noise floor, so a
  * humming laptop fan does not count as speech.
  */
-function startLevelMeter(stream: MediaStream): LevelMeter {
+function startLevelMeter(
+  stream: MediaStream,
+  { silenceMs, onSilence }: { silenceMs: number; onSilence: () => void },
+): LevelMeter {
   let context: AudioContext;
   try {
     context = new AudioContext();
@@ -781,6 +916,7 @@ function startLevelMeter(stream: MediaStream): LevelMeter {
   let floor = Infinity;
   let firstVoice: number | null = null;
   let lastVoice: number | null = null;
+  let silenced = false;
 
   const timer = window.setInterval(() => {
     analyser.getFloatTimeDomainData(samples);
@@ -792,6 +928,9 @@ function startLevelMeter(stream: MediaStream): LevelMeter {
     if (rms > Math.max(0.012, floor * 4)) {
       firstVoice ??= now;
       lastVoice = now;
+    } else if (!silenced && lastVoice !== null && now - lastVoice > silenceMs) {
+      silenced = true;
+      onSilence();
     }
   }, 40);
 
@@ -799,7 +938,7 @@ function startLevelMeter(stream: MediaStream): LevelMeter {
     stop: () => {
       window.clearInterval(timer);
       source.disconnect();
-      void context.close();
+      void context.close().catch(() => {});
       if (firstVoice === null || lastVoice === null) return 0;
       // Half a frame either side, so one loud frame still counts as a moment of voice.
       return Math.max(0.04, (lastVoice - firstVoice) / 1000 + 0.04);

@@ -23,7 +23,9 @@
 //   text   {"type":"end"}
 // relay -> browser:
 //   binary 16-bit mono PCM at 24 kHz         the interviewer speaking
-//   text   {"type":"ready"} | {"type":"heard","text"} | {"type":"said","text"}
+//   text   {"type":"ready"} | {"type":"heard","text","finished"} | {"type":"said","text"}
+//          ("finished" marks the end of what the candidate said: Gemini's own
+//          end-of-speech detection, after SILENCE_MS of quiet)
 //          {"type":"interrupted"} | {"type":"turn_complete"} | {"type":"error","message"}
 
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -43,6 +45,8 @@ const MODEL = process.env.LIVE_MODEL ?? "gemini-live-2.5-flash-native-audio";
 const VOICE = process.env.LIVE_VOICE ?? "Kore";
 /** Gemini Live caps an audio session at 15 minutes; end cleanly just before. */
 const MAX_SESSION_MS = 14 * 60 * 1000;
+/** Quiet this long ends the candidate's turn. A thinking pause is shorter. */
+const SILENCE_MS = Number(process.env.LIVE_SILENCE_MS ?? 1500);
 /** A browser sends ~100 ms audio frames; anything this big is not a microphone. */
 const MAX_FRAME_BYTES = 64 * 1024;
 /** LIVE_DEBUG=1 logs what the gate drops. It never logs the candidate's words. */
@@ -202,7 +206,7 @@ wss.on("connection", (ws) => {
             inputAudioTranscription: {},
             outputAudioTranscription: {},
             // A thinking pause mid-answer should not hand the turn to the interviewer.
-            realtimeInputConfig: { automaticActivityDetection: { silenceDurationMs: 1500 } },
+            realtimeInputConfig: { automaticActivityDetection: { silenceDurationMs: SILENCE_MS } },
           },
           callbacks: {
             onmessage: (event) => {
@@ -220,7 +224,9 @@ wss.on("connection", (ws) => {
                   if (!directed && content.outputTranscription?.text) console.info("[live] dropped:", content.outputTranscription.text);
                   if (content.interrupted || content.turnComplete) console.info("[live]", content.interrupted ? "interrupted" : "turn complete", directed ? "(directed)" : "");
                 }
-                if (content.inputTranscription?.text) send({ type: "heard", text: content.inputTranscription.text });
+                if (content.inputTranscription?.text || content.inputTranscription?.finished) {
+                  send({ type: "heard", text: content.inputTranscription.text ?? "", finished: !!content.inputTranscription.finished });
+                }
                 if (content.interrupted) send({ type: "interrupted" });
                 if (content.turnComplete) {
                   if (directed) send({ type: "turn_complete" });
