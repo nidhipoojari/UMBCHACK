@@ -1075,6 +1075,77 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .mail-body > div { grid-template-columns: minmax(0, 1fr); }
 }
 
+/* ===========================================================================
+   GAP INTERVIEW — "Close the gaps" on the Jobs page
+   The agent is the landing page's greeter, reused as-is (.greeter, .greeter__face,
+   .greeter__caption, .greeter__hint live in globals.css). These rules only fit it
+   into a workspace section and lay out the transcript and the typed answers.
+   =========================================================================== */
+
+.gi__greeter { margin: 4px auto 0; }
+/* Nothing to do on a tap while it is thinking: say so with the cursor, not a dim face. */
+.gi__greeter .greeter__face:disabled { cursor: default; }
+.gi__greeter .greeter__face:disabled:hover { transform: none; }
+.gi__greeter .greeter__caption { font-size: 16px; max-width: 60ch; text-align: center; }
+
+/* The conversation so far, in the same caption cards: the agent's lines on the
+   left with its prompt mark, the student's on the right in the muted "you" style. */
+.gi__transcript {
+  list-style: none;
+  margin: 26px auto 0;
+  padding: 0;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gi__transcript .greeter__caption { max-width: 85%; font-size: 15px; align-self: flex-start; }
+.gi__transcript .greeter__caption.is-you { align-self: flex-end; }
+.gi__transcript .greeter__caption.is-you::before { content: none; }
+.gi__greeter .greeter__caption.is-you::before { content: none; }
+.gi__note {
+  align-self: center;
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.gi__gaps { list-style: none; margin: 26px auto 0; padding: 0; max-width: 720px; display: grid; gap: 8px; }
+.gi__gaps li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--card);
+}
+.gi__gaps strong { font-weight: 400; font-size: 18px; }
+.gi__gaps .muted { font-size: 14.5px; }
+.gi__actions { justify-content: center; }
+
+.gi__form { display: grid; gap: 4px; max-width: 720px; margin: 26px auto 0; }
+.gi__q { margin: 0; font-size: 16px; line-height: 1.5; color: var(--ink); }
+.gi__form textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.gi__form textarea:focus { border-color: var(--ink); outline: none; }
+.gi__form textarea:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+.gi__outcome { max-width: 720px; margin: 26px auto 0; }
+.gi__outcome h3 { margin: 22px 0 6px; font-size: 18px; font-weight: 400; }
+.gi__outcome .ws-row h3 { margin: 0 0 4px; }
+.gi__small { margin-top: 14px; font-size: 14px; }
+
 /* --- Network missions + secure agent line ---------------------------------
    These two screens share one visual idea: people see the exchange, while the
    cryptographic evidence stays one tap deeper. Colour distinguishes activity
@@ -1126,7 +1197,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   color: #fff;
   background: linear-gradient(145deg, #7468ff, #5847d8);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 7px 16px rgb(88 71 216 / 20%);
-  font: 700 0.78rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 700 0.78rem/1 var(--font-sans), Georgia, serif;
   letter-spacing: 0.04em;
 }
 .alumni-list > li:nth-child(3n + 2) .alumni-avatar { background: linear-gradient(145deg, #24c8ba, #078c8b); }
