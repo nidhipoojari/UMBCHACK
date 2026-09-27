@@ -47,6 +47,31 @@ jobs:
 
       - run: npm ci
 
+      # Turbopack resolves an externalised CJS package through an alias package
+      # it writes to .next/node_modules — for pg, "pg-587764f78a6c7a9c". That
+      # directory matches the node_modules exclusion when the backend is
+      # packaged, so it never reaches the function and every /api/* route died
+      # with ERR_MODULE_NOT_FOUND on a name that exists only at build time.
+      # webpack emits an ordinary require instead, resolved from the
+      # node_modules the buildpack installs.
+      #
+      # It is a shim rather than a flag in the build script because
+      # firebase-tools spawns node_modules/.bin/next with a bare "build" and
+      # only WARNS that a custom build script exists — it never runs it. Its
+      # build is the one that produces the deployed bundle, so the flag has to
+      # be attached to the binary it actually calls.
+      - name: Build with webpack, not Turbopack
+        run: |
+          cd node_modules/.bin
+          mv next next-real
+          cat > next <<'SH'
+          #!/usr/bin/env bash
+          args=("$@")
+          if [ "${args[0]}" = "build" ]; then args+=(--webpack); fi
+          exec "$(dirname "$0")/next-real" "${args[@]}"
+          SH
+          chmod +x next
+
       # firebase deploy builds the app again itself (hosting.source points at
       # this directory). This step is kept anyway so a broken build fails in
       # forty seconds, with next's own error, before the job touches GCP.

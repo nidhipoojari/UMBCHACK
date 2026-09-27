@@ -25,7 +25,16 @@ import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg
  * Defaults match the other services' own lib/db.mjs under functions/, so that
  * the only thing the deployment must supply is the instance and the password.
  */
-const INSTANCE = process.env.CLOUD_SQL_INSTANCE;
+// K_SERVICE is set by Cloud Run and by nothing else, so this picks the
+// connector in the deployed backend and leaves a laptop on the direct path.
+// The instance is defaulted rather than set on the service because a frameworks
+// deploy rewrites the backend's plain environment variables every time —
+// CLOUD_SQL_INSTANCE was set by hand and was gone one deploy later — and
+// preserveExternalChanges only rescued the mounted secret. A connection name is
+// not a credential, so the durable place for it is here.
+const DEFAULT_INSTANCE = 'project-96b6d773-106a-457a-a46:us-east4:agenthire-db';
+const INSTANCE =
+  process.env.CLOUD_SQL_INSTANCE ?? (process.env.K_SERVICE ? DEFAULT_INSTANCE : undefined);
 const DB_NAME = process.env.DB_NAME ?? 'agenthire';
 const DB_USER = process.env.DB_USER ?? 'agenthire_app';
 
