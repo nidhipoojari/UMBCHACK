@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { courseworkEvidence } from '@/lib/coursework';
 import { db } from '@/lib/db';
 import { generateText, parseJsonObject } from '@/lib/gemini';
 
@@ -57,6 +58,8 @@ export type Finding = {
   evidence: string | null;
   /** What they actually said, as transcribed or typed. */
   said: string;
+  /** Set when the evidence is the applicant's coursework stand-in rather than an answer. */
+  from?: 'coursework';
 };
 
 export type RankedRole = { job_id: string; title: string | null; company: string | null; rank: number; score: number };
@@ -390,6 +393,9 @@ function touching(p: Posting, findings: Finding[]): Finding[] {
   return findings.filter((f) => {
     if (!CAP[f.verdict] || matched.has(f.key)) return false;
     if (missing.has(f.key)) return true;
+    // Coursework tags as short as "C" or "R" appear inside too much unrelated text
+    // to be trusted in a free-text search; they only count where the matcher named them.
+    if (f.from === 'coursework' && f.skill.length <= 2) return false;
     return new RegExp(`(^|[^a-z0-9])${escape(f.skill.toLowerCase())}([^a-z0-9]|$)`, 'i').test(p.description);
   });
 }
@@ -400,7 +406,8 @@ function adjustPrompt(items: { i: number; posting: Posting; findings: Finding[] 
     'for those skills. Adjust ONLY what those answers change for each posting below.',
     '',
     'Answer meanings: "has" = they described concrete use (project, internship, job). "some" = coursework, tutorials',
-    'or brief exposure: partial, never fully met.',
+    'or brief exposure: partial, never fully met. Answers marked "from": "coursework" come from courses on their',
+    'transcript rather than from what they said: treat them exactly like "some".',
     '',
     'Postings (one JSON object per line). old_fit is the score before the answers; answers lists the ones that apply:',
     ...items.map(({ i, posting, findings }) =>
@@ -411,7 +418,7 @@ function adjustPrompt(items: { i: number; posting: Posting; findings: Finding[] 
         old_fit: Math.round(posting.score * 100),
         old_reason: posting.reason,
         still_missing: posting.skills_missing,
-        answers: findings.map((f) => ({ skill: f.skill, verdict: f.verdict, evidence: f.evidence })),
+        answers: findings.map((f) => ({ skill: f.skill, verdict: f.verdict, evidence: f.evidence, ...(f.from ? { from: f.from } : {}) })),
         text: posting.description.replace(/\s+/g, ' ').slice(0, JD_CHARS),
       }),
     ),
@@ -448,7 +455,13 @@ function heardLine(f: Finding): string {
 }
 
 /** What gets read aloud at the end: the read-back first, then what moved. */
-export function summarise(findings: Finding[], before: RankedRole[], after: RankedRole[], raised: number): string {
+export function summarise(
+  findings: Finding[],
+  before: RankedRole[],
+  after: RankedRole[],
+  raised: number,
+  coursework: string[] = [],
+): string {
   const heard = findings.filter((f) => f.said.trim()).map(heardLine);
   if (!heard.length) return "I didn't catch any answers, so your matches are unchanged.";
   const noted = heard.length > 1 ? `${heard.slice(0, -1).join('; ')}; and ${heard.at(-1)}` : heard[0];
@@ -462,7 +475,11 @@ export function summarise(findings: Finding[], before: RankedRole[], after: Rank
   if (top) moved = `${up.length} ${up.length === 1 ? 'role' : 'roles'} moved up, and ${name(top)} is now number ${top.rank}.`;
   else if (raised) moved = `${raised} ${raised === 1 ? 'role fits' : 'roles fit'} a little better now, but the order held.`;
   else moved = "None of your matched roles depend on those skills, so the order stays the same.";
-  return `Here's what I noted: ${noted}. ${moved}`;
+  const taught = coursework.slice(0, 3);
+  const courses = taught.length
+    ? ` Your coursework in ${taught.length > 1 ? `${taught.slice(0, -1).join(', ')} and ${taught.at(-1)}` : taught[0]} counted too.`
+    : '';
+  return `Here's what I noted: ${noted}. ${moved}${courses}`;
 }
 
 /**
@@ -479,9 +496,22 @@ export async function rerankMatches(
   fresh: Finding[],
   { save = true }: { save?: boolean } = {},
 ): Promise<RerankResult> {
-  const [postings, earlier] = await Promise.all([loadPostings(documentId), loadFindings(userId)]);
+  const [postings, earlier, taught] = await Promise.all([
+    loadPostings(documentId),
+    loadFindings(userId),
+    courseworkEvidence(userId),
+  ]);
   // Everything answered before, with today's answers taking precedence.
-  const merged = new Map(earlier.map((f) => [f.key, f]));
+  // Coursework is the base layer: partial evidence for every skill the stand-in
+  // transcript teaches. Anything the student actually said overrides it, earlier
+  // answers first and today's last, so an honest "no" beats a course on paper.
+  const merged = new Map<string, Finding>(
+    taught.map(({ skill, evidence }) => [
+      gapKey(skill),
+      { key: gapKey(skill), skill, verdict: 'some', evidence, said: '', from: 'coursework' },
+    ]),
+  );
+  for (const f of earlier) merged.set(f.key, f);
   for (const f of fresh) if (f.said.trim()) merged.set(f.key, f);
   const findings = [...merged.values()];
   const before = postings.map(roleOf);
@@ -490,12 +520,18 @@ export async function rerankMatches(
     .map((posting, i) => ({ i, posting, findings: touching(posting, findings) }))
     .filter((item) => item.findings.length);
 
+  // Only postings a spoken answer touches go to the model. Coursework reaches
+  // nearly every posting, and weighing it with a model call per interview made
+  // the read-back wait ~25 s; it is small, partial evidence, so a rule does it.
+  const courseworkOnly = (item: (typeof items)[number]) => item.findings.every((f) => f.from === 'coursework');
+  const forModel = items.filter((item) => !courseworkOnly(item));
+
   // The model says how much each answer matters to each posting; the caps say how much it may.
   const adjusted = new Map<number, { fit: number; reason: string | null }>();
-  if (items.length) {
+  if (forModel.length) {
     try {
       const parsed = parseJsonObject(
-        await generateText(adjustPrompt(items), { json: true, temperature: 0.2, timeoutMs: 30_000 }),
+        await generateText(adjustPrompt(forModel), { json: true, temperature: 0.2, timeoutMs: 30_000 }),
       ) as { results?: { i?: unknown; fit?: unknown; reason?: unknown }[] };
       for (const r of parsed.results ?? []) {
         if (typeof r.i !== 'number' || typeof r.fit !== 'number') continue;
@@ -515,8 +551,10 @@ export async function rerankMatches(
     const old = Math.round(p.score * 100);
     const cap = Math.max(...item.findings.map((f) => CAP[f.verdict]));
     const model = adjusted.get(i);
-    // Without the model: half the cap, a modest and predictable nudge.
-    const fit = Math.min(100, Math.max(old, Math.min(old + cap, model?.fit ?? old + Math.ceil(cap / 2))));
+    // Coursework alone: two points per course-taught skill the posting wants, within
+    // the "some" cap. Without the model otherwise: half the cap, a modest nudge.
+    const rule = courseworkOnly(item) ? old + Math.min(cap, 2 * item.findings.length) : old + Math.ceil(cap / 2);
+    const fit = Math.min(100, Math.max(old, Math.min(old + cap, model?.fit ?? rule)));
     // Skills they have used move from missing to have. Partial exposure stays missing.
     const used = new Set(item.findings.filter((f) => f.verdict === 'has').map((f) => f.key));
     const usedNames = item.findings.filter((f) => f.verdict === 'has').map((f) => f.skill);
@@ -553,5 +591,11 @@ export async function rerankMatches(
   }
 
   const after = scored.map((s, index) => roleOf({ ...s.posting, rank: index + 1, score: s.score }));
-  return { findings: fresh, before, after, summary: summarise(fresh, before, after, raised) };
+  // Coursework skills that actually bore on a role, most roles first, for the read-back.
+  const courseworkUse = new Map<string, number>();
+  for (const item of items) {
+    for (const f of item.findings) if (f.from === 'coursework') courseworkUse.set(f.skill, (courseworkUse.get(f.skill) ?? 0) + 1);
+  }
+  const courseworkSkills = [...courseworkUse.entries()].sort((a, b) => b[1] - a[1]).map(([skill]) => skill);
+  return { findings: fresh, before, after, summary: summarise(fresh, before, after, raised, courseworkSkills) };
 }
