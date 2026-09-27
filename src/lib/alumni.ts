@@ -62,7 +62,13 @@ export type AlumniAgent = {
   monthsToFirstJob: number | null;
   foundVia: string | null;
   internships: number | null;
-  /** Grounded advice, assembled from this row plus the cohort. */
+  /** One scannable line for the card: role at employer. */
+  headline: string;
+  /**
+   * The fuller, cohort-aware version. Held back until the student actually
+   * reaches out — it is what the alumnus "replies", and printing it on every
+   * card was what turned the roster into a wall of near-identical paragraphs.
+   */
   advice: string;
   /** Already connected — the roster shows these differently and grants no XP. */
   connected: boolean;
@@ -166,7 +172,16 @@ export async function cohortStats(major: string, track: string | null): Promise<
  * sentinel, so an alumnus with a sparse row says less instead of saying
  * something invented.
  */
-function adviceFor(agent: Omit<AlumniAgent, 'advice' | 'connected'>, stats: CohortStats): string {
+/** The card line. Role and employer only — everything else is a pill. */
+function headlineFor(agent: { jobTitle: string | null; employer: string | null }): string {
+  if (agent.jobTitle && agent.employer) return `${agent.jobTitle} at ${agent.employer}`;
+  return agent.jobTitle ?? agent.employer ?? 'First destination not reported';
+}
+
+function adviceFor(
+  agent: Omit<AlumniAgent, 'advice' | 'connected' | 'headline'>,
+  stats: CohortStats,
+): string {
   const parts: string[] = [];
 
   if (agent.jobTitle && agent.employer) {
@@ -245,7 +260,8 @@ export async function alumniRoster(
     internship_count: string | null;
     connected: boolean;
   }>(
-    `SELECT a.campus_id, a.major, a.track, a.degree_level, a.graduation_year,
+    `SELECT DISTINCT ON (a.first_job_found_via)
+            a.campus_id, a.major, a.track, a.degree_level, a.graduation_year,
             a.first_job_title, a.first_employer, a.first_employer_industry,
             a.first_job_region, a.first_job_is_remote, a.months_to_first_job,
             a.first_job_found_via, a.internship_count,
@@ -257,13 +273,17 @@ export async function alumniRoster(
         AND a.first_destination = 'Employed Full-Time'
         AND a.first_job_title IS NOT NULL
         AND a.first_job_title NOT IN ('Not Applicable', 'No Response', '')
-      ORDER BY CASE WHEN a.months_to_first_job ~ '${NUMERIC_SQL}'
-                     THEN a.months_to_first_job::numeric END NULLS LAST,
+        AND a.first_job_found_via NOT IN ('Not Applicable', 'No Response', '')
+      ORDER BY a.first_job_found_via,
+               CASE WHEN a.months_to_first_job ~ '${NUMERIC_SQL}'
+                    THEN a.months_to_first_job::numeric END NULLS LAST,
                a.campus_id
       LIMIT $3`,
     params,
   );
 
+  // DISTINCT ON had to order by the route to pick one per route; the student
+  // wants them fastest-first, so the final ordering happens here. Eight rows.
   return rows.map((row) => {
     const base = {
       campusId: row.campus_id,
@@ -283,8 +303,14 @@ export async function alumniRoster(
       foundVia: clean(row.first_job_found_via),
       internships: NUMERIC_RE.test(row.internship_count ?? '') ? Number(row.internship_count) : null,
     };
-    return { ...base, advice: adviceFor(base, stats), connected: row.connected };
-  });
+    return {
+      ...base,
+      headline: headlineFor(base),
+      advice: adviceFor(base, stats),
+      connected: row.connected,
+    };
+  })
+    .sort((a, b) => (a.monthsToFirstJob ?? 1e9) - (b.monthsToFirstJob ?? 1e9));
 }
 
 /** The cohorts a student can pick from — the dataset's own values, not a guess. */

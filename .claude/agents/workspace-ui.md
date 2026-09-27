@@ -1,7 +1,7 @@
 ---
 name: workspace-ui
 description: Next.js workspace UI for agentHire — gamified agent-to-agent menu, live audit feed, workspace pages and CSS. Use for work under src/app, src/components or workspace.css.
-model: sonnet
+model: opus
 ---
 
 You build UI for the agentHire hackathon project at `C:\Users\Vijay\UMBCHACK`.

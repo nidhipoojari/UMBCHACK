@@ -1,0 +1,104 @@
+/* ---- Verified badges ------------------------------------------------------
+   Two marks, quiet by default. Sized to sit on a line of text without pushing
+   it around, which is why the button has no padding of its own and the hit area
+   comes from a min-size instead. */
+
+.vb {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.vb-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 28px rather than the icon's 15px: a 15px tap target fails on a phone, and
+     these are the controls a student is most likely to reach for. */
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: color-mix(in srgb, currentColor 32%, transparent);
+  cursor: pointer;
+  transition: color 120ms ease, background 120ms ease;
+}
+.vb-badge:hover,
+.vb-badge:focus-visible {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+/* An unearned badge is drawn, not hidden. If the absence of a mark were
+   invisible the presence of one would mean nothing. */
+.vb-badge:not(.is-on) {
+  opacity: 0.45;
+}
+.vb-badge.is-on {
+  color: var(--ink, currentColor);
+}
+.vb-badge.is-on.is-secure {
+  color: #1d9a6c;
+}
+
+.vb-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: min(330px, calc(100vw - 32px));
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  background: var(--surface, #fff);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  text-align: left;
+  font-weight: 400;
+}
+.vb-panel h4 {
+  margin: 0 0 8px;
+  font-size: 0.92rem;
+}
+.vb-panel ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.vb-panel li {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 8px;
+  align-items: start;
+  font-size: 0.83rem;
+  line-height: 1.4;
+}
+.vb-panel li > div {
+  display: grid;
+  gap: 1px;
+}
+.vb-panel li strong {
+  font-weight: 600;
+}
+.vb-panel li span {
+  opacity: 0.72;
+}
+.vb-panel li.is-pass > svg {
+  color: #1d9a6c;
+}
+.vb-panel li.is-fail > svg {
+  color: #c0392b;
+}
+
+@media (max-width: 520px) {
+  /* Anchored to the right edge instead, so a badge near the end of a row does
+     not open a panel that runs off the screen. */
+  .vb-panel {
+    left: auto;
+    right: 0;
+  }
+}
