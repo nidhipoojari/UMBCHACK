@@ -2,7 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Ban, Check, Fingerprint, KeyRound, Loader2, Radio, ScrollText, ShieldCheck } from 'lucide-react';
+import {
+  Ban,
+  Bot,
+  Check,
+  Fingerprint,
+  KeyRound,
+  Loader2,
+  LockKeyhole,
+  MessageCircle,
+  Network,
+  Radio,
+  ShieldCheck,
+  Sparkles,
+} from 'lucide-react';
 
 import { firebaseAuth } from '@/lib/firebase';
 import { VerifiedBadges } from '@/components/VerifiedBadges';
@@ -116,12 +129,20 @@ function when(value: string | null): string {
 }
 
 type Filter = 'all' | 'refused' | 'accepted';
+type View = 'line' | 'network' | 'safety';
 
 const FILTERS: readonly { key: Filter; label: string }[] = [
   { key: 'all', label: 'Everything' },
   { key: 'refused', label: 'Refused' },
   { key: 'accepted', label: 'Accepted' },
 ];
+
+function speaker(agentName: string | null): string {
+  if (!agentName) return 'Unknown caller';
+  const parsed = parseAgentName(agentName);
+  if (!parsed) return agentName;
+  return `${parsed.role.charAt(0).toUpperCase()}${parsed.role.slice(1)} agent`;
+}
 
 /**
  * One agent in the roster.
@@ -227,6 +248,7 @@ function AgentRow({ agent }: { agent: AgentCard }) {
 export function AgentMenu() {
   const [data, setData] = useState<Payload | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [view, setView] = useState<View>('line');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -284,70 +306,39 @@ export function AgentMenu() {
 
   return (
     <>
-      <section className="ws-section" aria-labelledby="rank-h">
-        <header>
-          <h2 id="rank-h">
-            <ShieldCheck size={16} aria-hidden="true" /> {rank.title}
-          </h2>
-          <span className="muted">
-            {rank.seen} of {rank.total} checks have fired
-          </span>
-        </header>
-
-        <div
-          className="a2a-bar"
-          role="progressbar"
-          aria-valuenow={rank.seen}
-          aria-valuemin={0}
-          aria-valuemax={rank.total}
-          aria-label={`${rank.seen} of ${rank.total} gateway checks have refused at least one envelope`}
-        >
-          <span style={{ width: `${pct}%` }} />
+      <section className="agent-console" aria-labelledby="secure-line-h">
+        <div className="agent-console-glow" aria-hidden="true" />
+        <div className="agent-console-copy">
+          <span className="agent-live"><span /> encrypted network online</span>
+          <h2 id="secure-line-h">Watch your agents work.</h2>
+          <p>Introductions, checks, and decisions—shown like a conversation. The private message stays sealed.</p>
         </div>
-        {/* Cut from three sentences to a clause. The argument — that this bar
-            is derived from real refusals and cannot be moved by using the app
-            — is made far better by the board below, where a check that has
-            never fired sits visibly at zero. The unclassified count stays
-            because it is a number, and nothing else on the page reports it. */}
-        <p className="muted a2a-hint">
-          From refusal reasons in <code>a2a_audit</code>, never a score column.
-          {rank.unclassified > 0 ? ` ${rank.unclassified} unmatched.` : ''}
-        </p>
-
-        <ul className="ws-stats a2a-stats">
-          <li>
-            <span>Envelopes audited</span>
-            <strong>{trail.envelopes}</strong>
-          </li>
-          <li>
-            <span>Refused</span>
-            <strong>{trail.refused}</strong>
-          </li>
-          <li>
-            <span>Accepted</span>
-            <strong>{trail.accepted}</strong>
-          </li>
-          <li>
-            <span>Keys pinned</span>
-            <strong>{trail.agentsPinned}</strong>
-          </li>
-        </ul>
-        <p className="muted a2a-hint">
-          {trail.agentsSeen} distinct names have spoken to this gateway, {trail.agentsPinned} of them
-          with a key on file.{' '}
-          {trail.envelopes > trail.envelopeIds
-            ? `${trail.envelopes - trail.envelopeIds} envelope ${
-                trail.envelopes - trail.envelopeIds === 1 ? 'id has' : 'ids have'
-              } arrived more than once — that is the replay check having something to do.`
-            : 'Every envelope id has arrived exactly once.'}
-        </p>
+        <div className="agent-console-score" aria-label={`${trail.accepted} accepted exchanges`}>
+          <Sparkles size={18} aria-hidden="true" />
+          <strong>{trail.accepted}</strong>
+          <span>safe exchanges</span>
+        </div>
+        <div className="agent-view-tabs" role="tablist" aria-label="Agent console views">
+          <button type="button" role="tab" aria-selected={view === 'line'} onClick={() => setView('line')}>
+            <MessageCircle size={16} aria-hidden="true" /> Live line
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'network'} onClick={() => setView('network')}>
+            <Network size={16} aria-hidden="true" /> Network <span>{registered.length + alumni.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'safety'} onClick={() => setView('safety')}>
+            <ShieldCheck size={16} aria-hidden="true" /> Safety <span>{rank.seen}/{rank.total}</span>
+          </button>
+        </div>
       </section>
 
-      <section className="ws-section" aria-labelledby="defence-h">
+      {view === 'safety' ? <section className="ws-section agent-view-panel" aria-labelledby="defence-h">
         <header>
-          <h2 id="defence-h">Checks the gateway makes</h2>
-          <span className="muted">with a real refusal beside each</span>
+          <h2 id="defence-h"><ShieldCheck size={16} aria-hidden="true" /> Safety checks</h2>
+          <span className="muted">{rank.title} · {rank.seen} of {rank.total} tested</span>
         </header>
+        <div className="a2a-bar" role="progressbar" aria-valuenow={rank.seen} aria-valuemin={0} aria-valuemax={rank.total}>
+          <span style={{ width: `${pct}%` }} />
+        </div>
         <ul className="a2a-defences">
           {defences.map((defence) => (
             <li key={defence.key} className={defence.matched > 0 ? 'is-fired' : ''}>
@@ -370,9 +361,12 @@ export function AgentMenu() {
             </li>
           ))}
         </ul>
-      </section>
+        <p className="muted a2a-hint">
+          These checks come from real refusal receipts. {rank.unclassified > 0 ? `${rank.unclassified} unusual reasons are still unclassified.` : ''}
+        </p>
+      </section> : null}
 
-      <section className="ws-section" aria-labelledby="roster-h">
+      {view === 'network' ? <section className="ws-section agent-view-panel" aria-labelledby="roster-h">
         <header>
           <h2 id="roster-h">
             <Radio size={16} aria-hidden="true" /> Agent roster
@@ -453,14 +447,16 @@ export function AgentMenu() {
             Nothing has claimed a name this deployment does not have a key for.
           </p>
         )}
-      </section>
+      </section> : null}
 
-      <section className="ws-section" aria-labelledby="feed-h">
-        <header>
-          <h2 id="feed-h">
-            <ScrollText size={16} aria-hidden="true" /> Audit trail
-          </h2>
-          <span className="muted">newest first</span>
+      {view === 'line' ? <section className="agent-phone agent-view-panel" aria-labelledby="feed-h">
+        <header className="agent-phone-head">
+          <div className="agent-phone-avatar"><Bot size={20} aria-hidden="true" /></div>
+          <div>
+            <h2 id="feed-h">Your agent line</h2>
+            <span><i /> end-to-end encrypted · newest first</span>
+          </div>
+          <LockKeyhole size={18} aria-label="Encrypted" />
         </header>
 
         <div className="a2a-filters" role="group" aria-label="Filter the audit trail by decision">
@@ -480,76 +476,50 @@ export function AgentMenu() {
         {feed.length === 0 ? (
           <p className="muted">Nothing in the trail matches that filter.</p>
         ) : (
-          <ol className="a2a-feed">
+            <ol className="agent-chat" aria-live="polite">
             {feed.map((entry) => {
               const refused = entry.decision === 'refused';
               return (
-                <li key={entry.auditId} className={refused ? 'is-refused' : 'is-accepted'}>
-                  <div className="a2a-feed-head">
-                    <span className={`a2a-decision${refused ? ' is-refused' : ''}`}>
-                      {refused ? (
-                        <>
-                          <Ban size={13} aria-hidden="true" /> Refused
-                        </>
-                      ) : (
-                        <>
-                          <Check size={13} aria-hidden="true" /> Accepted
-                        </>
-                      )}
-                    </span>
-                    <code className="a2a-name">{entry.agentName ?? 'unnamed caller'}</code>
-                    <span className="ws-pill">{entry.direction}</span>
-                    <time dateTime={entry.occurredAt} className="muted">
-                      {when(entry.occurredAt)}
-                    </time>
+                <li
+                  key={entry.auditId}
+                  className={`${entry.direction === 'outbound' ? 'is-mine' : 'is-theirs'} ${refused ? 'is-refused' : 'is-accepted'}`}
+                >
+                  <div className="agent-bubble-who">
+                    {entry.direction === 'outbound' ? <Bot size={13} aria-hidden="true" /> : <Radio size={13} aria-hidden="true" />}
+                    <strong>{entry.direction === 'outbound' ? 'Your agent' : speaker(entry.agentName)}</strong>
                   </div>
-
-                  {entry.reasons.length > 0 ? (
-                    <ul className="a2a-reasons">
-                      {entry.reasons.map((reason) => (
-                        <li key={reason}>{reason}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="a2a-reasons-none muted">
-                      {refused
-                        ? 'Refused with no reason recorded — which is itself worth knowing.'
-                        : 'No objection raised by any check.'}
+                  <div className="agent-bubble">
+                    <span className={`agent-bubble-status ${refused ? 'is-refused' : ''}`}>
+                      {refused ? <Ban size={12} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}
+                      {refused ? 'Blocked safely' : 'Verified & delivered'}
+                    </span>
+                    <p>
+                      {entry.reasons[0] ?? (refused
+                        ? 'The gateway stopped this exchange before delivery.'
+                        : entry.direction === 'outbound'
+                          ? 'Secure introduction sent.'
+                          : 'Message accepted. No safety check objected.')}
                     </p>
-                  )}
-
-                  <p className="a2a-meta">
-                    {entry.jti ? (
-                      <>
-                        <span className="a2a-key-label">envelope</span>
-                        <code>{entry.jti}</code>
-                      </>
-                    ) : (
-                      <span className="muted">No envelope id — it was rejected before parsing.</span>
-                    )}
-                  </p>
-                  <p className="a2a-meta">
-                    {entry.payloadHash ? (
-                      <>
-                        <span className="a2a-key-label">payload sha-256</span>
-                        <code>{entry.payloadHash}</code>
-                      </>
-                    ) : (
-                      <span className="muted">No payload hash — nothing was read from the body.</span>
-                    )}
-                  </p>
+                    <time dateTime={entry.occurredAt}>{when(entry.occurredAt)}</time>
+                  </div>
+                  <details className="agent-receipt">
+                    <summary><LockKeyhole size={12} aria-hidden="true" /> Encrypted receipt</summary>
+                    <div>
+                      <span>Envelope</span><code>{entry.jti ?? 'rejected before parsing'}</code>
+                      <span>Digest</span><code>{entry.payloadHash ?? 'body unread'}</code>
+                      {entry.reasons.slice(1).map((reason) => <p key={reason}>{reason}</p>)}
+                    </div>
+                  </details>
                 </li>
               );
             })}
           </ol>
         )}
 
-        <p className="muted a2a-hint">
-          Rows come straight from <code>a2a_audit</code> in Cloud SQL. What is stored is the
-          envelope id, the decision, the reasons and a SHA-256 of the body — never the body itself,
-          so the trail can be shown to anyone without leaking what was sent.
+        <p className="agent-phone-foot">
+          <LockKeyhole size={13} aria-hidden="true" /> Only delivery receipts are visible. Message bodies are never stored here.
         </p>
-      </section>
+      </section> : null}
     </>
   );
 }

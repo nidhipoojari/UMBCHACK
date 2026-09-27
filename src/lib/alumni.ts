@@ -235,7 +235,7 @@ export async function alumniRoster(
   userId: string,
   major: string,
   track: string | null,
-  limit = 12,
+  limit = 16,
 ): Promise<AlumniAgent[]> {
   const stats = await cohortStats(major, track);
 
