@@ -1,4 +1,7 @@
-/* Pipeline board: one list of tracked roles, ordered by stage. */
+/* Pipeline board: one column per stage across the full page. On a narrower
+   screen the columns wrap onto more rows instead of scrolling sideways. */
+
+.ws-main.ws-main-wide { max-width: none; }
 
 .pipe-muted { color: var(--muted); line-height: 1.6; }
 
@@ -9,32 +12,37 @@
   outline-offset: 3px;
 }
 
-.pipe-cards {
-  list-style: none;
-  margin: 28px 0 0;
-  padding: 0;
-  border-top: 1px solid var(--line);
+.pipe-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0 24px;
+  margin-top: 28px;
 }
-.pipe-card { padding: 20px 0; border-bottom: 1px solid var(--line); }
+.pipe-col { padding: 22px 0 36px; min-inline-size: 0; border-top: 1px solid var(--line-strong); }
 
-.pipe-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.pipe-col-head h2 { font-size: 19px; letter-spacing: 0.02em; margin: 0; }
+.pipe-count {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-top: 5px;
+}
+.pipe-col-hint { font-size: 15px; margin: 8px 0 0; max-width: 30ch; }
+.pipe-col-empty {
+  font-size: 15px;
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+}
+
+.pipe-cards { list-style: none; margin: 18px 0 0; padding: 0; }
+.pipe-card { padding: 18px 0; border-top: 1px solid var(--line); }
+
 .pipe-card-title { margin: 0; font-size: 18px; line-height: 1.3; }
 .pipe-card-title a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .pipe-card-company { margin: 5px 0 0; font-size: 16px; }
-
-.pipe-stage {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  padding: 3px 10px;
-}
-.pipe-stage b { font-weight: 600; }
 
 /* Said in words with a rule beside it; colour is never the only signal. */
 .pipe-card-stalled {
@@ -108,3 +116,16 @@
 .pipeline-save .spin { animation: pipe-spin 0.9s linear infinite; }
 @keyframes pipe-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pipeline-save .spin { animation: none; } }
+
+/* Wide screens: all seven stages side by side. */
+@media (min-width: 1200px) {
+  .pipe-board { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line-strong); }
+  .pipe-col { border-top: 0; padding-inline: 14px; }
+  .pipe-col:first-child { padding-inline-start: 0; }
+  .pipe-col:last-child { padding-inline-end: 0; }
+  .pipe-col + .pipe-col { border-inline-start: 1px solid var(--line); }
+  .pipe-col-head h2 { font-size: 17px; }
+  .pipe-col-hint { min-block-size: 3.2em; }
+  .pipe-card-title { font-size: 16px; }
+  .pipe-card-company { font-size: 15px; }
+}

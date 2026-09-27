@@ -6,8 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { authedFetch } from '@/lib/authed-fetch';
 import {
   PIPELINE_STATUSES,
+  STATUS_HINT,
   STATUS_LABEL,
-  STATUS_MARK,
   daysPhrase,
   stalledSentence,
   type PipelineBoard as Board,
@@ -23,7 +23,7 @@ function cardName(card: PipelineCard): string {
 }
 
 /**
- * Every role the applicant is tracking, in stage order. The stage is a native
+ * Every role the applicant is tracking, one column per stage. The stage is a native
  * <select> on each card: keyboard and screen-reader friendly, and there is no
  * drag and drop to be the only way in. A card only moves once the server has
  * recorded the change, every move is announced, and focus follows the card.
@@ -35,6 +35,7 @@ export function PipelineBoard() {
   const [error, setError] = useState<string | null>(null);
   const [savingJobId, setSavingJobId] = useState<string | null>(null);
   const focusJobId = useRef<string | null>(null);
+  const [movedJobId, setMovedJobId] = useState<string | null>(null);
 
   const selectRefs = useRef(new Map<string, HTMLSelectElement>());
 
@@ -58,16 +59,17 @@ export function PipelineBoard() {
     };
   }, []);
 
-  // Changing a stage remounts the card's <select>; put focus back on it.
+  // Changing a stage remounts the card in its new column; put focus back on its <select>.
   useEffect(() => {
     if (!focusJobId.current) return;
     selectRefs.current.get(focusJobId.current)?.focus();
     focusJobId.current = null;
   }, [cards]);
 
-  const ordered = useMemo(() => {
-    if (!cards) return [];
-    return PIPELINE_STATUSES.flatMap((stage) => cards.filter((card) => card.status === stage));
+  const grouped = useMemo(() => {
+    const byStage = new Map<PipelineStatus, PipelineCard[]>(PIPELINE_STATUSES.map((stage) => [stage, []]));
+    for (const card of cards ?? []) byStage.get(card.status)?.push(card);
+    return byStage;
   }, [cards]);
 
   const change = useCallback(async (card: PipelineCard, next: PipelineStatus, note?: string) => {
@@ -87,6 +89,7 @@ export function PipelineBoard() {
       if (!response.ok) throw new Error(payload.error ?? `Could not save (${response.status}).`);
 
       focusJobId.current = card.job_id;
+      setMovedJobId(card.job_id);
       setCards((current) =>
         (current ?? []).map((existing) =>
           existing.job_id === card.job_id
@@ -134,7 +137,7 @@ export function PipelineBoard() {
         <p className="muted" role="status">
           Loading your pipeline…
         </p>
-      ) : ordered.length === 0 ? (
+      ) : cards.length === 0 ? (
         <section className="ws-section pipe-empty">
           <h2>Nothing in the pipeline yet</h2>
           <p className="pipe-muted">
@@ -143,20 +146,42 @@ export function PipelineBoard() {
           </p>
         </section>
       ) : (
-        <ul className="pipe-cards">
-          {ordered.map((card) => (
-            <Card
-              key={card.job_id}
-              card={card}
-              saving={savingJobId === card.job_id}
-              onChange={change}
-              registerRef={(element) => {
-                if (element) selectRefs.current.set(card.job_id, element);
-                else selectRefs.current.delete(card.job_id);
-              }}
-            />
-          ))}
-        </ul>
+        <div className="pipe-board">
+          {PIPELINE_STATUSES.map((stage) => {
+            const stageCards = grouped.get(stage) ?? [];
+            const headingId = `pipe-col-${stage}`;
+            return (
+              <section key={stage} className="pipe-col" aria-labelledby={headingId}>
+                <header className="pipe-col-head">
+                  <h2 id={headingId}>{STATUS_LABEL[stage]}</h2>
+                  <span className="pipe-count">
+                    {stageCards.length} {stageCards.length === 1 ? 'role' : 'roles'}
+                  </span>
+                  <p className="pipe-muted pipe-col-hint">{STATUS_HINT[stage]}</p>
+                </header>
+                {stageCards.length === 0 ? (
+                  <p className="pipe-muted pipe-col-empty">Nothing here yet.</p>
+                ) : (
+                  <ul className="pipe-cards">
+                    {stageCards.map((card) => (
+                      <Card
+                        key={card.job_id}
+                        card={card}
+                        saving={savingJobId === card.job_id}
+                        startOpen={movedJobId === card.job_id}
+                        onChange={change}
+                        registerRef={(element) => {
+                          if (element) selectRefs.current.set(card.job_id, element);
+                          else selectRefs.current.delete(card.job_id);
+                        }}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </section>
+            );
+          })}
+        </div>
       )}
     </>
   );
@@ -165,34 +190,33 @@ export function PipelineBoard() {
 function Card({
   card,
   saving,
+  startOpen,
   onChange,
   registerRef,
 }: {
   card: PipelineCard;
   saving: boolean;
+  startOpen: boolean;
   onChange: (card: PipelineCard, next: PipelineStatus, note?: string) => Promise<void>;
   registerRef: (element: HTMLSelectElement | null) => void;
 }) {
   const selectId = `pipe-status-${card.job_id}`;
   const noteId = `pipe-note-${card.job_id}`;
   const [note, setNote] = useState('');
+  // A card that just moved mounts open, so its <select> can take focus again.
+  const [open, setOpen] = useState(startOpen);
   const stalled = stalledSentence(card);
   const role = card.title ?? 'this role';
   const company = card.company ?? 'this company';
 
   return (
     <li className="pipe-card">
-      <div className="pipe-card-head">
-        <p className="pipe-card-title">
-          <Link href={`/applicant/jobs/${encodeURIComponent(card.job_id)}`}>
-            {card.title ?? 'Untitled role'}
-            <span className="sr-only"> at {company}, open this role</span>
-          </Link>
-        </p>
-        <span className="pipe-stage">
-          <b aria-hidden="true">{STATUS_MARK[card.status]}</b> {STATUS_LABEL[card.status]}
-        </span>
-      </div>
+      <p className="pipe-card-title">
+        <Link href={`/applicant/jobs/${encodeURIComponent(card.job_id)}`}>
+          {card.title ?? 'Untitled role'}
+          <span className="sr-only"> at {company}, open this role</span>
+        </Link>
+      </p>
       <p className="pipe-card-company">
         {card.company ?? 'Company not recorded'}
         {card.location ? <span className="pipe-muted"> · {card.location}</span> : null}
@@ -200,7 +224,7 @@ function Card({
 
       {stalled ? <p className="pipe-card-stalled">{stalled}</p> : null}
 
-      <details className="pipe-card-more">
+      <details className="pipe-card-more" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
         <summary>
           Details and stage
           <span className="sr-only">
@@ -265,7 +289,7 @@ function Card({
         </div>
 
         <label className="pipe-note-label" htmlFor={`${noteId}-input`}>
-          Note for {role}
+          Note<span className="sr-only"> for {role}</span>
         </label>
         <textarea
           id={`${noteId}-input`}
