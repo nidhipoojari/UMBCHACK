@@ -2,8 +2,16 @@
 
 /**
  * Real job matches, from the job-matcher service by way of the match-jobs
- * Cloud Function. Used on Jobs (every match) and Overview (the top few, plus
- * the headline numbers).
+ * Cloud Function. One caller now: the Jobs page, which is where the headline
+ * numbers sit too.
+ *
+ * THE NUMBERS AND THE LIST SHARE ONE FETCH, and that is the point of them
+ * being in the same component. They used to be on separate screens — Overview
+ * counted the response, Jobs rendered it — so `/api/matches` was requested
+ * twice, and polled twice while a match run was still pending, to show two
+ * views of a single answer. Worse, the two views could disagree for a few
+ * seconds: whichever page was opened second had its own `status: pending` to
+ * work through.
  */
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -53,8 +61,17 @@ function emptyState(data: MatchesResponse | null, error: string | null): React.R
   return null;
 }
 
-function MatchRow({ match, detailed }: { match: JobMatch; detailed: boolean }) {
-  const meta = [match.company, match.location, detailed ? posted(match.posted_at) : null].filter(Boolean).join(' · ');
+/**
+ * One match.
+ *
+ * This used to take a `detailed` flag with exactly one false caller, the
+ * Overview screen, and what it turned off was the three things that make a row
+ * worth reading: when the role was posted, which of your skills matched, and
+ * which are missing. With that screen gone the flag had one value, so the row
+ * simply shows them.
+ */
+function MatchRow({ match }: { match: JobMatch }) {
+  const meta = [match.company, match.location, posted(match.posted_at)].filter(Boolean).join(' · ');
   return (
     <li className="ws-row ws-match">
       <div>
@@ -67,14 +84,14 @@ function MatchRow({ match, detailed }: { match: JobMatch; detailed: boolean }) {
         </h3>
         <p>{meta}</p>
         {match.reason ? <p className="ws-match__why">{match.reason}</p> : null}
-        {detailed && match.skills_matched.length ? (
+        {match.skills_matched.length ? (
           <ul className="ws-tags" aria-label="Skills you have">
             {match.skills_matched.slice(0, 6).map((skill) => (
               <li key={skill}>{skill}</li>
             ))}
           </ul>
         ) : null}
-        {detailed && match.skills_missing.length ? (
+        {match.skills_missing.length ? (
           <p className="ws-match__gap">Missing: {match.skills_missing.slice(0, 5).join(', ')}</p>
         ) : null}
       </div>
@@ -94,39 +111,17 @@ function MatchRow({ match, detailed }: { match: JobMatch; detailed: boolean }) {
   );
 }
 
-/** Every match, for the Jobs page. */
+/**
+ * The headline numbers, then every match.
+ *
+ * `best` is the first row rather than a scan for the maximum because the API
+ * returns them ordered by score — the same assumption the stat tile made on
+ * Overview. If that ordering ever changes, this tile is where it shows.
+ */
 export function MatchList() {
   const { data, error } = useMatches();
   const empty = emptyState(data, error);
-
-  return (
-    <section className="ws-section" aria-labelledby="matches-h">
-      <header>
-        <h2 id="matches-h">Matches</h2>
-        {data?.matches.length ? (
-          <span className="muted">
-            {data.matches.length} roles
-            {data.poolSize ? `, picked from ${data.poolSize.toLocaleString()} US postings in the last 30 days` : ''}
-          </span>
-        ) : null}
-      </header>
-      {data && basis(data) ? <p className="ws-match__basis">{basis(data)}</p> : null}
-      {empty ?? (
-        <ul className="ws-list">
-          {data!.matches.map((match) => (
-            <MatchRow key={match.job_id} match={match} detailed />
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/** Headline numbers and the top three, for Overview, with `aside` beside them. */
-export function OverviewMatches({ aside }: { aside: React.ReactNode }) {
-  const { data, error } = useMatches();
   const matches = data?.matches ?? [];
-  const empty = emptyState(data, error);
   const best = matches[0];
 
   return (
@@ -136,25 +131,27 @@ export function OverviewMatches({ aside }: { aside: React.ReactNode }) {
           { label: 'Roles matched', value: data ? String(matches.length) : '–' },
           { label: 'Best fit', value: best ? fit(best) : '–' },
           { label: 'Postings checked', value: data?.poolSize ? data.poolSize.toLocaleString() : '–' },
-          { label: 'Applied', value: '0' },
         ]}
       />
-      <div className="ws-grid">
-        <section className="ws-section" aria-labelledby="top-h">
-          <header>
-            <h2 id="top-h">Top matches</h2>
-            <Link href="/applicant/jobs">All jobs</Link>
-          </header>
-          {empty ?? (
-            <ul className="ws-list">
-              {matches.slice(0, 3).map((match) => (
-                <MatchRow key={match.job_id} match={match} detailed={false} />
-              ))}
-            </ul>
-          )}
-        </section>
-        {aside}
-      </div>
+      <section className="ws-section" aria-labelledby="matches-h">
+        <header>
+          <h2 id="matches-h">Matches</h2>
+          {matches.length ? (
+            <span className="muted">
+              {matches.length} roles
+              {data?.poolSize ? `, picked from ${data.poolSize.toLocaleString()} US postings in the last 30 days` : ''}
+            </span>
+          ) : null}
+        </header>
+        {data && basis(data) ? <p className="ws-match__basis">{basis(data)}</p> : null}
+        {empty ?? (
+          <ul className="ws-list">
+            {matches.map((match) => (
+              <MatchRow key={match.job_id} match={match} />
+            ))}
+          </ul>
+        )}
+      </section>
     </>
   );
 }
