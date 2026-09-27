@@ -1640,7 +1640,36 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   font-size: 0.78rem;
   opacity: 0.85;
 }
-.agent-transcript .agent-bubble { background: color-mix(in srgb, currentColor 5%, transparent); }
+/* NOT .is-mine. The shared rule paints an outbound bubble white-on-purple, and
+   an earlier version of this override replaced the background without the
+   colour -- white text on a near-white panel, invisible. The applicant's turns
+   keep the gradient they were designed for; only the employer's side is
+   re-tinted so the two speakers stay distinguishable. */
+.agent-transcript .agent-chat > li:not(.is-mine) .agent-bubble {
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+/* A generated turn has no receipt, so its bubble has no status line and can be
+   tighter than an audit bubble. */
+.agent-transcript .agent-bubble { min-width: 0; }
+.agent-transcript .agent-chat { gap: 1.15rem; padding: 0.85rem 1rem; }
+
+/* Each turn lands just after the one above it, so the exchange reads as a
+   conversation arriving rather than a block appearing. Six steps is enough for
+   the four exchanges this renders; beyond that the delay would outlast anyone's
+   patience, so it stops rather than growing. */
+.agent-transcript .agent-chat > li:nth-child(1) { animation-delay: 0ms; }
+.agent-transcript .agent-chat > li:nth-child(2) { animation-delay: 110ms; }
+.agent-transcript .agent-chat > li:nth-child(3) { animation-delay: 220ms; }
+.agent-transcript .agent-chat > li:nth-child(4) { animation-delay: 330ms; }
+.agent-transcript .agent-chat > li:nth-child(5) { animation-delay: 440ms; }
+.agent-transcript .agent-chat > li:nth-child(n + 6) { animation-delay: 550ms; }
+
+/* Motion is the flourish; the conversation is the content. With motion off the
+   turns are simply there, in order, with no delay to sit through. */
+@media (prefers-reduced-motion: reduce) {
+  .agent-transcript .agent-chat > li { animation: none; animation-delay: 0ms !important; }
+}
 
 /* ---- Match cards ----------------------------------------------------------
    Three complaints, one block: the rows ran together, nothing carried colour,

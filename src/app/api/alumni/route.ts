@@ -1,4 +1,5 @@
 import { alumniRoster, cohortOptions, cohortStats, progressFor } from '@/lib/alumni';
+import { alumniQuestions } from '@/lib/alumni-question-gen';
 import { verifyIdToken } from '@/lib/verify-token';
 
 /**
@@ -30,5 +31,10 @@ export async function GET(request: Request) {
     cohortOptions(),
   ]);
 
-  return Response.json({ agents, stats, progress, options });
+  // After the stats, not beside them: the questions are written FROM the route
+  // distribution, so there is nothing to parallelise. alumniQuestions never
+  // throws — a model outage costs tailoring, not the control.
+  const questions = await alumniQuestions(stats);
+
+  return Response.json({ agents, stats, progress, options, questions });
 }
