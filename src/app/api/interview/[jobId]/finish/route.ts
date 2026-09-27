@@ -7,6 +7,7 @@ import {
   type InterviewFinishRequest,
 } from '@/lib/interview-contract';
 import { requireApplicant } from '@/lib/require-applicant';
+import { fromJobSlug } from '@/lib/job-slug';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ const MAX_ANSWER_CHARS = 8_000;
 export async function POST(request: Request, { params }: { params: Promise<{ jobId: string }> }) {
   const user = await requireApplicant(request);
   if (user instanceof Response) return user;
-  const jobId = decodeURIComponent((await params).jobId);
+  const jobId = fromJobSlug((await params).jobId);
 
   let body: Partial<InterviewFinishRequest>;
   try {

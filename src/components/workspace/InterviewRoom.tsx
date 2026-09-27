@@ -132,7 +132,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
         return;
       }
       try {
-        const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/session`);
+        const response = await authedFetch(`/api/interview/${toJobSlug(jobId)}/session`);
         const payload = (await response.json()) as InterviewSessionPayload & { error?: string };
         if (cancelled) return;
         if (!response.ok) {
@@ -218,7 +218,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
       let pending = speechCache.current.get(questionId);
       if (!pending) {
         pending = (async () => {
-          const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/speak`, {
+          const response = await authedFetch(`/api/interview/${toJobSlug(jobId)}/speak`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ sessionId: session.sessionId, questionId }),
@@ -315,7 +315,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
       const form = new FormData();
       form.append('audio', blob, 'answer');
       form.append('speech_seconds', speechSeconds.toFixed(2));
-      const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/transcribe`, {
+      const response = await authedFetch(`/api/interview/${toJobSlug(jobId)}/transcribe`, {
         method: 'POST',
         body: form,
       });
@@ -390,7 +390,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
       if (!session) return;
       setBusy('Writing your readout.');
       try {
-        const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/finish`, {
+        const response = await authedFetch(`/api/interview/${toJobSlug(jobId)}/finish`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ sessionId: session.sessionId, answers: allAnswers }),
@@ -449,7 +449,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
       };
 
       try {
-        const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/turn`, {
+        const response = await authedFetch(`/api/interview/${toJobSlug(jobId)}/turn`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({

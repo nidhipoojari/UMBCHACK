@@ -4,6 +4,7 @@ import { renderBlockedHtml, renderDocumentHtml, renderNoticeHtml, renderResumeHt
 import { getArtifact } from '@/lib/artifacts/store';
 import { requireApplicant } from '@/lib/require-applicant';
 import { sql } from '@/lib/sql';
+import { fromJobSlug } from '@/lib/job-slug';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,10 +41,10 @@ export async function GET(
   const user = await requireApplicant(request);
   if (user instanceof Response) return user;
   const { jobId, artifactId } = await params;
-  const decodedArtifactId = decodeURIComponent(artifactId);
+  const decodedArtifactId = fromJobSlug(artifactId);
 
   try {
-    const job = await loadJob(sql, decodeURIComponent(jobId));
+    const job = await loadJob(sql, fromJobSlug(jobId));
     if (!job) {
       return htmlResponse(
         renderNoticeHtml({ title: 'Unknown posting', message: 'No posting with that id exists, so there is nothing to print against it.' }),

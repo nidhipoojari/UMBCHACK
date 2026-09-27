@@ -67,7 +67,11 @@ export function SavePipelineButton({
               : 'Save to my pipeline'}
       </button>
 
-      <p aria-live="polite">
+      {/* The class distinguishes the IDLE hint from actual feedback. A list can
+          hide the hint after the first card -- twenty copies of the same
+          sentence is wallpaper -- without ever hiding an error or a
+          confirmation, which must always be visible wherever the button is. */}
+      <p aria-live="polite" className={error || justSaved || status ? 'pipeline-save__status' : 'pipeline-save__hint'}>
         {error ? (
           <span role="alert">{error}</span>
         ) : justSaved ? (

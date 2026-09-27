@@ -29,6 +29,19 @@ import { toJobSlug } from '@/lib/job-slug';
 
 const fit = (m: JobMatch) => `${Math.round(m.score * 100)}`;
 
+/**
+ * Three bands, not a gradient. A continuous colour ramp asks the reader to
+ * judge a hue against a scale that is not drawn anywhere; three steps say
+ * "strong / worth a look / a stretch" without pretending to a precision the
+ * score does not have.
+ */
+const scoreBand = (m: JobMatch) => {
+  const score = m.score * 100;
+  if (score >= 90) return 'is-strong';
+  if (score >= 75) return 'is-good';
+  return 'is-fair';
+};
+
 const LEVEL_NAMES: Record<NonNullable<MatchesResponse['level']>, string> = {
   early: 'early-career',
   mid: 'mid-level',
@@ -106,13 +119,31 @@ function MatchRow({ match, stage }: { match: JobMatch; stage: PipelineStatus | n
           Eligible
         </span>
       ) : match.eligibility === 'unknown' ? (
-        <span className="ws-pill" title={match.eligibility_reason ?? undefined}>
-          Check eligibility
-        </span>
+        /* A LINK, NOT A LABEL. "Check eligibility" is an instruction, and an
+           instruction with nothing to press is a dead end — the student is
+           told to do something and given no way to do it. The posting is
+           where the answer is, so that is where it goes. It sits above the
+           card's stretched anchor so it wins the click. */
+        <Link
+          className="ws-pill ws-pill--action"
+          href={`/applicant/jobs/${toJobSlug(match.job_id)}#eligibility`}
+          title={match.eligibility_reason ?? undefined}
+        >
+          Check eligibility <ArrowRight size={12} aria-hidden="true" />
+        </Link>
       ) : (
         <span />
       )}
-      <strong aria-label={`Fit ${fit(match)} out of 100`}>{fit(match)}</strong>
+      {/* The score is what the eye lands on first, so it gets the one tinted
+          surface on the card. The band is the score's own: a 90 and a 60 are
+          different decisions, and rendering them identically made the reader
+          do the comparison the number already did. */}
+      <strong
+        className={`ws-match__fit ${scoreBand(match)}`}
+        aria-label={`Fit ${fit(match)} out of 100`}
+      >
+        {fit(match)}
+      </strong>
       {/* Saving from the list rather than only from the detail page. Deciding
           to chase a role is a judgement made while scanning — requiring a
           navigation first meant the cheapest action in the product was the one

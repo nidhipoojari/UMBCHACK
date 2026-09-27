@@ -9,6 +9,7 @@ import { interviewUnlocked, putPreparedSession, type InterviewSessionPayload } f
 import type { PipelineStatus } from '@/lib/pipeline-contract';
 
 import './interview.css';
+import { toJobSlug } from '@/lib/job-slug';
 
 /** Whether a role at this stage gets the button: Applied, Interviewing or Offer. */
 export function offersInterview(status: PipelineStatus | null): boolean {
@@ -50,9 +51,9 @@ export function StartInterviewButton({
         if (!response.ok) throw new Error(`Could not mark this role Interviewing (${response.status}).`);
       }
       // Best effort: if this fails the room fetches its own session.
-      const session = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/session`).catch(() => null);
+      const session = await authedFetch(`/api/interview/${toJobSlug(jobId)}/session`).catch(() => null);
       if (session?.ok) putPreparedSession(jobId, (await session.json()) as InterviewSessionPayload);
-      router.push(`/applicant/interview/${encodeURIComponent(jobId)}`);
+      router.push(`/applicant/interview/${toJobSlug(jobId)}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
       setBusy(false);
