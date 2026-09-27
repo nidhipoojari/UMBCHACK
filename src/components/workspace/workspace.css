@@ -975,3 +975,19 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .a2a-details[open] {
   margin-top: 2px;
 }
+
+.alumni-headline {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.alumni-headline .muted {
+  font-weight: 400;
+}
+/* The route is the single most useful fact on a card — it is the thing the
+   student is here to learn — so it leads the pill row and is the only one
+   tinted. */
+.ws-pill--route {
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  font-weight: 600;
+}

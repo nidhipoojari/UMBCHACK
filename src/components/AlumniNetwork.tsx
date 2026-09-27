@@ -38,6 +38,7 @@ type Agent = {
   monthsToFirstJob: number | null;
   foundVia: string | null;
   internships: number | null;
+  headline: string;
   advice: string;
   connected: boolean;
 };
@@ -163,6 +164,16 @@ export function AlumniNetwork() {
 
   const { agents, stats, progress, options } = data;
   const tracks = options.find((o) => o.major === major)?.tracks ?? [];
+
+  // A route is learned once, not once per cohort. Rendering unlocks against
+  // only the selected cohort's routes meant switching major hid what the
+  // student had already discovered — it read as having earned nothing. The
+  // cohort's routes still lead, because those are the ones worth chasing here;
+  // anything discovered elsewhere is appended rather than dropped.
+  const extra = progress.routesUnlocked
+    .filter((route) => !stats.routes.some((r) => r.route === route))
+    .map((route) => ({ route, count: 0, share: 0 }));
+  const allRoutes = [...stats.routes, ...extra];
   const pct = Math.round((progress.xpIntoLevel / progress.xpForNextLevel) * 100);
 
   return (
@@ -192,15 +203,21 @@ export function AlumniNetwork() {
           worth 10 — reaching the same person twice is worth nothing, and is recorded as a refusal.
         </p>
 
-        <h3 className="alumni-sub">Routes discovered</h3>
+        <h3 className="alumni-sub">
+          Routes discovered — {progress.routesUnlocked.length} of {allRoutes.length}
+        </h3>
         <ul className="alumni-routes">
-          {stats.routes.map((r) => {
+          {allRoutes.map((r) => {
             const unlocked = progress.routesUnlocked.includes(r.route);
             return (
               <li key={r.route} className={unlocked ? 'is-unlocked' : ''}>
                 <strong>{unlocked ? r.route : '???'}</strong>
                 <span className="muted">
-                  {unlocked ? `${Math.round(r.share * 100)}% of this cohort` : 'not yet discovered'}
+                  {!unlocked
+                    ? 'not yet discovered'
+                    : r.count === 0
+                      ? 'discovered in another cohort'
+                      : `${Math.round(r.share * 100)}% of this cohort`}
                 </span>
               </li>
             );
@@ -284,13 +301,30 @@ export function AlumniNetwork() {
                 </span>
               </div>
 
-              <p className="alumni-advice">{replies[agent.campusId] ?? agent.advice}</p>
+              <p className="alumni-headline">
+                {agent.headline}
+                {agent.industry ? <span className="muted"> · {agent.industry}</span> : null}
+              </p>
+
+              {/* The reply, and only the reply. Printing the cohort-aware
+                  paragraph on every card repeated the same median on all of
+                  them and buried the one line that differs. It arrives when
+                  the alumnus actually answers. */}
+              {replies[agent.campusId] ? (
+                <p className="alumni-advice">{replies[agent.campusId]}</p>
+              ) : null}
 
               <div className="alumni-actions">
+                {agent.foundVia ? (
+                  <span className="ws-pill ws-pill--route">{agent.foundVia}</span>
+                ) : null}
                 {agent.monthsToFirstJob !== null ? (
                   <span className="ws-pill">
                     {agent.monthsToFirstJob < 0.1 ? 'straight in' : `${agent.monthsToFirstJob.toFixed(1)} mo`}
                   </span>
+                ) : null}
+                {agent.internships ? (
+                  <span className="ws-pill">{agent.internships} internship{agent.internships === 1 ? '' : 's'}</span>
                 ) : null}
                 {agent.region ? <span className="ws-pill">{agent.region}</span> : null}
                 {agent.remote ? <span className="ws-pill">Remote</span> : null}
