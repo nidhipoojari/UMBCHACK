@@ -84,6 +84,8 @@ type Payload = {
   stats: Stats;
   progress: Progress;
   options: { major: string; tracks: string[] }[];
+  /** Three prompts written for this cohort. Absent on an older payload. */
+  questions?: string[];
 };
 
 async function authedFetch(url: string, init?: RequestInit): Promise<Response> {
@@ -220,6 +222,14 @@ export function AlumniNetwork() {
   }
 
   const { agents, stats, progress, options } = data;
+
+  // Three prompts written for this cohort, falling back to the hardcoded list.
+  // The fallback is not only for a model outage: an older cached payload has no
+  // `questions` at all, and an empty chip row would read as a broken control
+  // rather than as a missing nicety.
+  const chips = (data.questions?.length ? data.questions : ALUMNI_QUESTIONS.map((q) => q.label)).map(
+    (label, index) => ({ id: `q${index}`, label, prompt: label }),
+  );
   const tracks = options.find((o) => o.major === major)?.tracks ?? [];
 
   // A route is learned once, not once per cohort. Rendering unlocks against
@@ -406,7 +416,7 @@ export function AlumniNetwork() {
                   <fieldset className="alumni-question-set">
                     <legend><MessageCircleQuestion size={13} aria-hidden="true" /> Ask one useful thing</legend>
                     <div className="alumni-question-chips">
-                      {ALUMNI_QUESTIONS.map((item) => (
+                      {chips.map((item) => (
                         <button
                           key={item.id}
                           type="button"
