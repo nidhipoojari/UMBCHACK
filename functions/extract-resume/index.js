@@ -18,6 +18,7 @@ import { Storage } from '@google-cloud/storage';
 import { GoogleGenAI } from '@google/genai';
 import pg from 'pg';
 
+import { GitHubNotFound, fetchGitHub, githubLogin } from './github.js';
 import { INSTRUCTIONS, classifyLinks, detectGaps, parseJsonObject, profileSchema } from './profile.js';
 
 const OBJECT_PATH = /^applicants\/([^/]+)\/resumes\/([0-9a-f-]{36})\.pdf$/;
@@ -88,6 +89,46 @@ function narrator(db, documentId) {
 
 function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+/** Replaces the applicant's GitHub snapshot with a fresh one, in one transaction. */
+async function saveGitHub(db, userId, documentId, gh) {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `INSERT INTO profile_github
+         (user_id, login, name, bio, company, blog, location, public_repos, followers,
+          github_created_at, top_languages, total_stars, profile_url, source_document_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       ON CONFLICT (user_id) DO UPDATE SET
+         login = EXCLUDED.login, name = EXCLUDED.name, bio = EXCLUDED.bio,
+         company = EXCLUDED.company, blog = EXCLUDED.blog, location = EXCLUDED.location,
+         public_repos = EXCLUDED.public_repos, followers = EXCLUDED.followers,
+         github_created_at = EXCLUDED.github_created_at, top_languages = EXCLUDED.top_languages,
+         total_stars = EXCLUDED.total_stars, profile_url = EXCLUDED.profile_url,
+         source_document_id = EXCLUDED.source_document_id, fetched_at = now()`,
+      [
+        userId, gh.login, gh.name, gh.bio, gh.company, gh.blog, gh.location, gh.publicRepos,
+        gh.followers, gh.createdAt, gh.topLanguages, gh.totalStars, gh.profileUrl, documentId,
+      ],
+    );
+    await client.query('DELETE FROM profile_github_repos WHERE user_id = $1', [userId]);
+    for (const [ordinal, repo] of gh.repos.entries()) {
+      await client.query(
+        `INSERT INTO profile_github_repos
+           (user_id, name, description, language, stars, forks, topics, url, pushed_at, ordinal)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [userId, repo.name, repo.description, repo.language, repo.stars, repo.forks, repo.topics, repo.url, repo.pushedAt, ordinal],
+      );
+    }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 functions.cloudEvent('extractResume', async (cloudEvent) => {
@@ -276,6 +317,42 @@ functions.cloudEvent('extractResume', async (cloudEvent) => {
       client.release();
     }
     await log.settle('save', 'ok', 'Saved your profile', 'Every entry is linked back to this resume.');
+
+    // Enrichment. Never fails the run: the resume is already saved, and a
+    // missing or unreachable GitHub profile just means less to show.
+    const login = githubLogin(classifyLinks(profile.links).github_url);
+    if (!login) {
+      await step('github', 'Looking for a GitHub profile');
+      await log.settle('github', 'skip', 'No GitHub profile on your resume', 'Add one later and I will read it.');
+    } else {
+      await step('github', 'Reading your GitHub', `github.com/${login}`);
+      try {
+        const gh = await fetchGitHub(login);
+        await saveGitHub(db, userId, documentId, gh);
+        await log.settle(
+          'github',
+          'ok',
+          'Read your GitHub',
+          [
+            plural(gh.repos.length, 'public repo'),
+            gh.topLanguages.length ? `mostly ${gh.topLanguages.slice(0, 3).join(', ')}` : null,
+            gh.totalStars ? plural(gh.totalStars, 'star') : null,
+          ]
+            .filter(Boolean)
+            .join(' · '),
+        );
+      } catch (error) {
+        console.warn(`GitHub enrichment failed for ${login}:`, error);
+        await log.settle(
+          'github',
+          'skip',
+          'Could not read your GitHub',
+          error instanceof GitHubNotFound
+            ? `There is no GitHub user called ${login}.`
+            : 'GitHub did not answer. Your resume is saved either way.',
+        );
+      }
+    }
 
     await step('gaps', 'Checking what is missing');
     const gaps = detectGaps(profile);
