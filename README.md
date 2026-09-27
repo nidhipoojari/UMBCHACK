@@ -48,7 +48,7 @@ Two rules shaped every decision:
 | Track | What we built for it |
 |---|---|
 | **Overall** | A full product: resume intake → enrichment → job matching → drafting → verified agent-to-agent apply, with voice on top |
-| **DoIT: Navigating the Future: Career Pathways & Degree ROI** | The hackUMBC alumni and campus dataset loaded into Postgres, an alumni network built on it, and a career agent with `career_pathways`, `degree_roi` and `skill_gap` tools *(tools still return sample numbers; see [known gaps](#-known-gaps--whats-next))* |
+| **DoIT: Navigating the Future: Career Pathways & Degree ROI** | The hackUMBC alumni and campus dataset loaded into Postgres; a **coursework twin** for every applicant (one dataset student's transcript, matched to their resume, shown on Profile and counted when real job postings are ranked); an alumni network built on it; and a career agent with `career_pathways`, `degree_roi` and `skill_gap` tools *(tools still return sample numbers; see [known gaps](#-known-gaps--whats-next))* |
 | **CyberDawgs Cybersecurity Application** | The A2A gateway: ES256-signed envelopes, ECDH + AES-256-GCM sealing, replay protection, a trust index and an offline attack battery. *Requires the extensive documentation in the [trust protocol](#-the-agent-to-agent-trust-protocol) section and `functions/README.md`* |
 | **Best Entrepreneurial Idea** | A two-sided product for students and employers, where verified identity is the moat |
 | **Most Engaging Demo** | Tap the agent's face and it introduces itself out loud, then watch it refuse an employer that cannot prove who it is |
@@ -70,11 +70,12 @@ Two rules shaped every decision:
 | 🏢 **Employer check** | Is this company real? Checks where the posting came from, plus a live HTTPS handshake to the company's domain. | ✅ |
 | ✍️ **Autofill (never submits)** | Gemini plans the answers, and a Playwright worker on Cloud Run fills the real Greenhouse, Lever or Ashby form and returns a screenshot. Submission is disabled at deploy time. | ✅ |
 | 📋 **Pipeline board** | Seven stages (saved → applied → interviewing → offer → accepted, rejected, withdrawn), stored as events rather than overwritten status. | ✅ |
-| 🔐 **Verified agent-to-agent apply** | The applicant agent seals and signs an application to the employer agent. The employer reads its mailbox with a single-use signed credential. | ✅ |
+| 🔐 **Verified agent-to-agent apply** | Applying lives in the Agents tab's missions: the applicant agent seals and signs an application to the employer agent, and the employer reads its mailbox with a single-use signed credential. | ✅ |
 | 🕵️ **Agents tab** | The A2A registry and a live audit trail of every envelope: who sent it, whether it verified, and why it was refused if it was. | ✅ |
 | 🎓 **Alumni network** | Alumni matched to the student from the hackUMBC dataset, shown as mission cards, with agent-to-agent introductions. The Agents tab shows each exchange, with the cryptographic evidence one tap deeper. | ✅ |
 | 🎮 **Game layer** | Daily energy, streaks, XP, levels and achievements for reaching out, all derived from existing rows with nothing extra stored. | ✅ |
 | 🧠 **Career agent (Gemini tool loop)** | `/api/agent`: up to 4 tool rounds, answers only from tool results, always states *n*, replies kept under 50 words so they can be spoken. | 🟡 tools return sample numbers |
+| 🎓 **Coursework twin** | While the resume is processing, each applicant is matched to **one** current student from the hackUMBC dataset whose passed courses best fit the resume: same major, then the skills those courses teach (the dataset's 119-tag vocabulary), class level, track and course titles. No model call. It's made once and never changes, even after a new upload, and no student is given to two applicants. Shown on Profile, labelled synthetic, and counted as partial evidence when roles are ranked. Never added to the resume or to anything drafted. | ✅ |
 | 🎤 **Gap interview** | On the Jobs page, the agent counts the skills your matched roles keep asking for that your resume doesn't show, and asks about the top two or three **out loud** (or in a typed form). Gemini turns each answer into a verdict with your own evidence, then only the roles those answers touch are re-scored, each rising by a capped amount. Answers never become resume lines, so the fact gate can't be fooled by a spoken "yes". | ✅ |
 | 🎙️ **Voice routes** | ElevenLabs Scribe v2 (speech-to-text) and Flash v2.5 (text-to-speech) behind sign-in and a per-user rate limit. Used by the gap interview; the open-ended hands-free loop (`useVoiceAgent`) is not mounted yet. | ✅ |
 | 💬 **Chat drawer** | The right-hand transcript panel on every workspace page. | 🚧 seeded conversation, canned reply |
@@ -108,7 +109,7 @@ Two rules shaped every decision:
 
 **Backend & Data**
 - Next.js **Route Handlers**, all behind Firebase ID-token verification (`jose` against Google's JWKS)
-- **Cloud SQL for PostgreSQL** via the Cloud SQL connector and `pg`; 12 SQL migrations
+- **Cloud SQL for PostgreSQL** via the Cloud SQL connector and `pg`; 13 SQL migrations
 - Event-sourced pipeline (`application_events` → `latest_application_state` view)
 - **Cloud Functions gen2** triggered by Eventarc (GCS upload) and **Pub/Sub** (`resume-parsed` → `profile-enriched` / `jobs-matched`)
 - **Playwright** Chromium on Cloud Run for form autofill
@@ -150,7 +151,7 @@ Two rules shaped every decision:
 flowchart TD
     subgraph web["Next.js 16 on Firebase Hosting (frameworks backend)"]
         LP["Landing page<br/>agent face, star field, story"]
-        WS["Applicant and employer workspaces<br/>jobs, toolbox, pipeline, network, agents, apply, mailbox"]
+        WS["Applicant and employer workspaces<br/>jobs, gap interview, pipeline, network, agents, profile, mailbox"]
         API["Route handlers<br/>Firebase ID token on every call"]
     end
     subgraph data["Data"]
@@ -196,7 +197,7 @@ flowchart TD
 **A verified application, end to end:**
 
 ```
-student presses Apply on a matched role
+student approves an apply mission in the Agents tab
    → POST /api/a2a/apply                      (Firebase token, applicant role)
    → body sealed: ephemeral ECDH P-256 → HKDF-SHA256 → AES-256-GCM
    → sealed body signed: ES256 compact JWS  {iss, aud, jti, iat, exp ≤ 120 s}
@@ -277,13 +278,14 @@ Wherever colour carries meaning, the same state also has an icon and a text labe
 │   │   ├── useVoiceAgent.ts         Hands-free voice loop (not mounted yet)
 │   │   ├── useVoiceIO.ts            Scripted voice: speak a line, hear an answer
 │   │   ├── Starfield*.tsx           WebGL star field
-│   │   ├── workspace/               Shell, nav, chat drawer, jobs, pipeline, A2A, alumni
+│   │   ├── workspace/               Shell, nav, chat drawer, jobs, pipeline, A2A, alumni, coursework
 │   │   └── game/                    Energy, streak, XP, achievements, level-up
 │   └── lib/
 │       ├── agent/                   Gemini tool loop: client, tools, loop
 │       ├── artifacts/               Posting reads, drafting, fact gate, print view
 │       ├── match/ · autofill/       Eligibility, skill extraction, autofill evidence
 │       ├── a2a-*.ts                 Applicant/employer agent keys, apply, mailbox
+│       ├── coursework.ts            Coursework twin: resume → dataset student, transcript, rerank evidence
 │       ├── gaps.ts                  Gap interview: rank gaps, ask, judge answers, rerank
 │       ├── elevenlabs.ts            STT + TTS
 │       ├── verify-token.ts          Firebase ID-token verification
@@ -295,7 +297,7 @@ Wherever colour carries meaning, the same state also has an icon and a text labe
 │   ├── job-scanner/                 Board sweeper (Cloud Run Job)
 │   └── job-matcher/                 Skill + title matcher (Cloud Run)
 ├── services/ats-worker/             Playwright autofill (Cloud Run, private)
-├── sql/                             001–008 Postgres migrations
+├── sql/                             001–009 Postgres migrations
 ├── public/agenthire-intro.mp3       Saved voice intro
 ├── storage.rules                    Owner-only, PDF-only, 10 MB, no overwrite
 ├── firebase.json                    Hosting with the web frameworks backend
@@ -367,6 +369,7 @@ Every route requires a Firebase ID token (`Authorization: Bearer <token>`). "App
 | `GET /api/a2a` | signed in | Agent roster and audit counts |
 | `GET·POST /api/a2a/apply` | applicant | List matches, send a sealed application |
 | `GET /api/a2a/mailbox` | employer | Read the employer agent's inbox |
+| `GET·POST /api/coursework` | applicant | GET: the coursework twin's transcript for Profile. POST: match one now if there is none (idempotent; 409 without a parsed resume) |
 | `GET·POST /api/gaps` | applicant | GET: the skills the gap interview would cover. POST: start it (up to 3 spoken questions) |
 | `POST /api/gaps/answers` | applicant | Judge the answers, save them on `profile_gaps`, re-score the touched matches (409 if nothing was asked, 429 while a rerank is running) |
 | `POST /api/agent` | signed in | One turn with the Gemini career agent |
@@ -402,13 +405,13 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 |---|---|---|
 | `/` | Landing page: agent face with voice intro, star field, story, pathways | ✅ |
 | `/signin` · `/signup` | Email or Google; `?role=applicant\|employer` | ✅ |
-| `/applicant/intake/resume` → `/progress` | Upload a PDF, watch the profile build | ✅ |
+| `/applicant/intake/resume` → `/progress` | Upload a PDF, watch the profile build and the coursework twin get matched; Next leads to the gap interview | ✅ |
 | `/applicant` | Overview with real matches | 🟡 activity is sample |
 | `/applicant/jobs` · `/jobs/[jobId]` | Matches with the spoken gap interview, and the job page with toolbox, employer check and autofill | ✅ |
 | `/applicant/pipeline` | Seven-stage board | ✅ |
 | `/applicant/network` | Alumni network + game HUD | ✅ |
-| `/applicant/apply` · `/applicant/agents` | Verified apply desk, A2A registry and audit | ✅ |
-| `/applicant/profile` · `/account` | Profile facts, account | 🟡 skills list is sample |
+| `/applicant/agents` | Agent missions (apply, outreach), A2A registry and audit. `/applicant/apply` redirects here | ✅ |
+| `/applicant/profile` · `/account` | Profile facts, the Coursework card, account | 🟡 skills list is sample |
 | `/applicant/activity` | Activity feed | 🚧 |
 | `/employer/applicants` | Mailbox of verified applications | ✅ |
 | `/employer` · `/candidates` · `/activity` | Overview, search, feed | 🚧 |
@@ -417,7 +420,7 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 
 ## 🧾 Data, attribution & AI use
 
-- **Dataset:** alumni, students, transcripts, employment history, experience and the course catalog come from the hackUMBC 2026 dataset (`jasonpaluck/hackumbc-2026`), loaded by `functions/agent-gateway/load-dataset.mjs`. The DoIT track describes it as **synthetic**; nothing in agentHire should be read as real UMBC outcomes.
+- **Dataset:** alumni, students, transcripts, employment history, experience and the course catalog come from the hackUMBC 2026 dataset (`jasonpaluck/hackumbc-2026`), loaded by `functions/agent-gateway/load-dataset.mjs`. The DoIT track describes it as **synthetic**; nothing in agentHire should be read as real UMBC outcomes. Each applicant's coursework twin is a synthetic student's transcript standing in for their own, and is labelled that way everywhere it appears.
 - **career-ops (MIT):** the ATS providers, URL and user-agent helpers in `functions/job-scanner/lib/` and parts of the job-matcher skill and title matching are adapted from [santifer/career-ops](https://github.com/santifer/career-ops) v1.33.0, © 2026 Santiago Fernández de Valderrama, under the MIT License (`functions/job-scanner/lib/LICENSE.career-ops`). Several helpers in `src/lib/artifacts/` carry the same MIT header.
 - **AI use:** the team built this with Claude as a coding assistant. At runtime, Gemini powers extraction, enrichment, matching, drafting, autofill planning and the agent, and ElevenLabs provides the voice.
 
@@ -427,6 +430,7 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 
 Keeping ourselves honest:
 
+- **The first match doesn't see coursework yet.** `match-jobs` (a Cloud Function) ranks roles from the resume alone; coursework joins at the gap interview's re-ranking. Feeding it into `match-jobs` needs a redeploy of `functions/profile-pipeline`.
 - **Career tools return sample numbers.** `src/lib/agent/tools.ts` still has placeholder data. The next step is to swap each tool for a real query over the loaded dataset, keeping the result shape (numbers + *n*).
 - **The chat drawer isn't connected.** `ChatPanel.tsx` still has seeded turns. It should call `/api/agent` and mount the voice loop, sending the Firebase token.
 - **No number guard yet.** The system prompt forbids invented numbers, but nothing checks the reply against the tool results. That check is planned.
@@ -440,6 +444,7 @@ Keeping ourselves honest:
 
 | When (EDT) | What changed |
 |---|---|
+| Sun Sep 27, ~04:15 | Coursework twin: every applicant matched once to a unique hackUMBC dataset student during resume processing, a Coursework card on Profile, and coursework counted as partial evidence in the gap interview's re-ranking (`coursework_twins`, `009`); apply moved into agent missions |
 | Sun Sep 27, ~02:45 | Gap interview on the Jobs page (spoken or typed, capped re-scoring of affected matches); alumni network and Agents tab revamped as missions with a secure agent line; avatar initials back in Forum |
 | Sun Sep 27, ~02:00 | Voice agent: Gemini tool loop, ElevenLabs STT/TTS routes, tap-to-hear saved intro on the landing page; Forum across every page and form field; this README |
 | Sun Sep 27, ~01:30 | Pipeline board, job page, toolbox with fact gate, autofill worker; employer apply + mailbox via the gateway; game layer (energy, streak, XP, levels) |
