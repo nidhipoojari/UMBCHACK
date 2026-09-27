@@ -3,11 +3,11 @@ import 'server-only';
 /**
  * A small fixed-window rate limit, kept in memory.
  *
- * The landing page's voice agent works without signing in, so every call it
- * makes costs the project credits on behalf of an anonymous visitor. This caps
- * each visitor (by IP) per window. It is per server instance, not global, which
- * is enough to stop a script from draining the ElevenLabs and Gemini quotas
- * during a demo weekend.
+ * Every voice call costs the project ElevenLabs credits, so the voice routes cap
+ * each signed-in user per window. It is per server instance, not global, which
+ * is enough to stop a runaway loop from draining the quota during a demo
+ * weekend. clientIp() is here for any route that has to limit signed-out
+ * callers instead.
  */
 
 const buckets = new Map<string, { count: number; resetAt: number }>();
