@@ -180,8 +180,8 @@ export function JobPage({ jobId }: { jobId: string }) {
         <section className="jp-rehearse" aria-labelledby="jp-rehearse-h">
           <h2 id="jp-rehearse-h">Rehearse this interview</h2>
           <p>
-            A mock interview built from this posting and your gaps. Gemini writes the questions and can read them aloud;
-            answer typed or out loud, and get a readout at the end.
+            A live voice interview built from this posting and your gaps. A Gemini interviewer asks each question out
+            loud and hears your answers, and you get a readout at the end.
           </p>
           <StartInterviewButton jobId={job.job_id} status={stage} />
         </section>

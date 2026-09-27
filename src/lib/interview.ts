@@ -136,14 +136,13 @@ export async function buildSession(
       questions: [],
       questionSource: 'jd-deterministic',
       degraded: [],
-      voiceReady: false,
-      sttReady: false,
       liveReady: false,
     };
   }
 
   const inputs = questionInputs(context, jobTitle, company);
   const degraded: string[] = [];
+  if (!liveConfigured()) degraded.push('The live interviewer is not set up here, so the interview cannot start.');
 
   let questions = deterministicQuestions(inputs);
   let questionSource: QuestionSource = 'jd-deterministic';
@@ -180,8 +179,6 @@ export async function buildSession(
     questions,
     questionSource,
     degraded,
-    voiceReady: true,
-    sttReady: true,
     liveReady: liveConfigured(),
   };
 }

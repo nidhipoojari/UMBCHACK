@@ -99,8 +99,6 @@
 .iv-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
 .iv-actions .ws-button:disabled { opacity: 0.55; cursor: not-allowed; }
 
-/* Recording is said in the label; the dashed border is a second, non-colour cue. */
-.iv-recording { border-style: dashed; border-color: var(--failure); color: var(--failure); }
 
 .iv-hint { margin: 12px 0 0; }
 .iv-hint summary { cursor: pointer; color: var(--muted); font-size: 15px; }
@@ -134,3 +132,4 @@
 /* The live interviewer's wave takes --ink from the cascade, so it follows the theme. */
 .iv-wave { display: block; width: 100%; height: auto; color: var(--ink); image-rendering: pixelated; margin: 4px 0 10px; }
 .iv-voice-button { margin-top: 10px; }
+
