@@ -15,77 +15,105 @@ import { StoryArt } from './StoryArt';
 
 type Stage = {
   n: string;
+  /** Which drawing StoryArt paints. Kept apart from `n` so inserting a beat
+   *  renumbers the counter without handing every later card the wrong art. */
+  art: string;
   act: string;
   title: string;
   line: string;
 };
 
-/** The story, in eleven beats. Four of what is broken, one of arrival, five of
- *  how it works, one of where it goes. Each card is a live diagram of the beat;
- *  the words live underneath it. */
+/** The story, in thirteen beats. Four of what is broken, one of arrival, two of
+ *  who it is for, five of how it works, one of where it goes. Each card is a
+ *  live diagram of the beat; the words live underneath it. */
 const STAGES: Stage[] = [
   {
     n: '01',
+    art: 'applications',
     act: 'What is broken',
-    title: 'A hundred applications. Then another hundred.',
+    title: 'Senior year. A hundred applications. Then another hundred.',
     line: 'Most are never answered, and nobody tells you which ones.',
   },
   {
     n: '02',
+    art: 'forms',
     act: 'What is broken',
     title: 'The same eleven fields. Every single site.',
     line: 'Name, school, dates, upload the same PDF again. Re-typed, never reused.',
   },
   {
     n: '03',
+    art: 'hours',
     act: 'What is broken',
     title: 'Five hours a week, and nothing back.',
     line: 'Multiply that by everyone doing it and the country loses three billion hours a year.',
   },
   {
     n: '04',
+    art: 'ghost',
     act: 'What is broken',
     title: 'And some of those doors were never real.',
     line: 'Postings that exist to harvest a resume, from a company that was never hiring.',
   },
   {
     n: '05',
+    art: 'face',
     act: 'The turn',
     title: 'So we built agentHire.',
-    line: 'One agent that applies for you, and refuses out loud when something is wrong.',
+    line: 'A career agent for students. It applies for you, and refuses out loud when something is wrong.',
   },
   {
     n: '06',
+    art: 'voice',
     act: 'How it works',
     title: 'Just talk to it.',
     line: 'Say what you are looking for. No forms, no mouse, no thirty tabs.',
   },
   {
     n: '07',
+    art: 'match',
     act: 'How it works',
     title: 'Your resume in, the right roles out.',
-    line: 'Matched on your skills and your actual coursework, with the gaps named. Not on keywords.',
+    line: 'Every recent posting, read against your resume, scored out of 100 with the gaps named. Not on keywords.',
   },
   {
     n: '08',
+    art: 'alumni',
+    act: 'Built for students',
+    title: 'Ask the people who already got the job.',
+    line: 'Pick your major and see how your campus’s graduates got hired: how fast, for how much, and through which door. Your agent asks theirs for you.',
+  },
+  {
+    n: '09',
+    art: 'progress',
+    act: 'Built for students',
+    title: 'A job search that feels like progress.',
+    line: 'Daily energy, streaks and XP for every alumnus you reach. It counts people, not clicks, so it can only be earned.',
+  },
+  {
+    n: '10',
+    art: 'trust',
     act: 'How it works',
     title: 'First: is this employer real?',
     line: 'Five dimensions, each scored, each with a reason in plain English you can read.',
   },
   {
-    n: '09',
+    n: '11',
+    art: 'handshake',
     act: 'How it works',
     title: 'Your agent asks theirs to prove it.',
     line: 'Only once the certificate checks out does anything private leave your hands.',
   },
   {
-    n: '10',
+    n: '12',
+    art: 'handshake-reverse',
     act: 'How it works',
     title: 'Hiring? It runs both ways.',
     line: 'Their agent verifies yours the same way, so fabricated applicants stop at the door too.',
   },
   {
-    n: '11',
+    n: '13',
+    art: 'negotiation',
     act: 'The future',
     title: 'Agents negotiate. You decide.',
     line: 'They keep talking so you do not have to. You are brought in for the one part that matters.',
@@ -123,7 +151,7 @@ export function ArchitectureRail() {
    * Scroll position is the TARGET, not the answer.
    *
    * Mapping the track straight off `scrollYProgress` meant a wheel notch landed
-   * as a hard step — eleven discrete jerks rather than one carousel. The spring
+   * as a hard step — a dozen discrete jerks rather than one carousel. The spring
    * chases the target instead, so the track carries a little momentum into and
    * out of every card and a coarse input still reads as a glide. Lenis smooths
    * the vertical axis; this is the horizontal one, and both are needed.
@@ -137,7 +165,7 @@ export function ArchitectureRail() {
 
   const x = useTransform(eased, [0, 1], [0, -travel]);
 
-  // Which beat is centred. Guarded so scrolling re-renders eleven times over the
+  // Which beat is centred. Guarded so scrolling re-renders once per beat over the
   // whole section rather than on every frame.
   useMotionValueEvent(eased, 'change', (v) => {
     const n = Math.min(STAGES.length, Math.max(1, Math.floor(v * STAGES.length) + 1));
@@ -218,7 +246,7 @@ function Card({ stage }: { stage: Stage }) {
       {/* A drawing of the beat, not a photograph of a mood. It animates only
           while it is on screen, and holds a correct still frame otherwise. */}
       <div className="stage__card">
-        <StoryArt n={stage.n} />
+        <StoryArt art={stage.art} />
       </div>
     </article>
   );

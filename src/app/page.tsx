@@ -17,7 +17,7 @@ const SKILLS = [
   'Rewrites your resume for each role',
   'Drafts the cover letter',
   'Names the skills you are missing',
-  'Runs mock interviews out loud',
+  'Introduces you to alumni',
   'Logs every handshake, both ways',
 ];
 
@@ -146,7 +146,7 @@ const paths = [
   {
     eyebrow: 'FOR STUDENTS',
     title: 'Apply with your voice.',
-    body: 'Your agent reads your resume and your coursework, finds the roles that actually fit, and writes the materials for each one. Then it checks the employer is real, and refuses out loud if they cannot prove it. Start to finish without touching a mouse.',
+    body: 'Your agent reads your resume, finds the roles that actually fit, and writes the materials for each one. It introduces you to alumni from your major who already got there, and turns every real connection into streaks and XP. And it checks every employer is real, refusing out loud if they cannot prove it.',
     cta: 'Start as an applicant',
     href: '/signup?role=applicant',
   },
