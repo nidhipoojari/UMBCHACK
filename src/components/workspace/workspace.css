@@ -943,3 +943,35 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .a2a-feed li.is-refused { border-left-width: 3px; }
   .a2a-name { font-size: 0.82rem; }
 }
+
+/* Agent cards: the headline is a name and two marks; everything dense sits
+   behind the disclosure so the roster can be scanned rather than read. */
+.a2a-title {
+  font-size: 0.98rem;
+}
+.a2a-domain {
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
+.a2a-details > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  opacity: 0.6;
+  margin-top: 6px;
+  list-style: none;
+}
+.a2a-details > summary::-webkit-details-marker {
+  display: none;
+}
+.a2a-details > summary::before {
+  content: '▸ ';
+}
+.a2a-details[open] > summary::before {
+  content: '▾ ';
+}
+.a2a-details > summary:hover {
+  opacity: 1;
+}
+.a2a-details[open] {
+  margin-top: 2px;
+}

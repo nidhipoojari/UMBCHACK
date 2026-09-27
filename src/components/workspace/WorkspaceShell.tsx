@@ -17,7 +17,7 @@
  */
 import { onAuthStateChanged } from 'firebase/auth';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { type Account, fetchAccount } from '@/lib/auth';
 import { firebaseAuth } from '@/lib/firebase';
@@ -58,6 +58,12 @@ function GuardedWorkspace({
   const [account, setAccount] = useState<Account | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The path as it was when this shell mounted. Held in a ref rather than read
+  // from `pathname` inside the effect so that navigating between workspace
+  // pages does not re-run the effect — which would refetch the account, and so
+  // re-record the sign-in, on every single tab click.
+  const startPath = useRef(pathname);
+
   useEffect(
     () =>
       onAuthStateChanged(firebaseAuth, (user) => {
@@ -67,9 +73,29 @@ function GuardedWorkspace({
         }
         fetchAccount()
           .then((result) => {
+            // destinationFor answers "where should this person START", which is
+            // not the same question as "may this person be HERE". Treating the
+            // two as one made every workspace page unreachable while onboarding
+            // was unfinished: asking for /applicant/network computed
+            // /applicant/intake/resume, saw it differ, and redirected — so the
+            // Network and Agents tabs were visible in the nav and bounced when
+            // clicked, which reads as a broken link rather than as a gate.
+            //
+            // Two distinct checks now. Wrong workspace is a real authorisation
+            // failure and always redirects: an employer must not sit inside the
+            // applicant shell, and someone with no role yet has to pick one.
+            // Unfinished onboarding only redirects from the workspace ROOT,
+            // which is where someone lands right after signing in — so the
+            // funnel still works, and a deliberate click on another tab is
+            // honoured instead of being overridden.
             const destination = destinationFor(result.user.role, result.intake);
-            if (destination !== `/${role}`) router.replace(destination);
-            else setAccount(result);
+            const wrongWorkspace = !destination.startsWith(`/${role}`);
+            const atRoot = startPath.current === `/${role}`;
+            if (wrongWorkspace || (atRoot && destination !== `/${role}`)) {
+              router.replace(destination);
+            } else {
+              setAccount(result);
+            }
           })
           .catch(() => setError('Could not load your account. Try refreshing.'));
       }),
