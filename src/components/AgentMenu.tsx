@@ -5,16 +5,22 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Ban,
   Bot,
+  Building2,
   Check,
+  ChevronRight,
   Fingerprint,
+  Flame,
   KeyRound,
   Loader2,
   LockKeyhole,
   MessageCircle,
   Network,
   Radio,
+  Send,
   ShieldCheck,
   Sparkles,
+  Undo2,
+  Zap,
 } from 'lucide-react';
 
 import { firebaseAuth } from '@/lib/firebase';
@@ -113,9 +119,48 @@ type Payload = {
   feed: AuditEntry[];
 };
 
-async function authedFetch(url: string): Promise<Response> {
+type Match = {
+  job_id: string;
+  rank: number;
+  title: string | null;
+  company: string | null;
+  location: string | null;
+  url: string | null;
+  score: number;
+  reason: string | null;
+};
+
+type Attempt = {
+  jobId: string;
+  accepted: boolean;
+};
+
+type ApplyContext = {
+  missing: string[];
+  ourFingerprint: string | null;
+  employer: { agentName: string; fingerprint: string; revokedAt: string | null } | null;
+  matches: Match[];
+  sent: Attempt[];
+};
+
+type ApplyOutcome = {
+  ok: boolean;
+  error?: string;
+  accepted: boolean;
+  reasons: string[];
+  jti: string | null;
+  messageId: string | null;
+  ciphertextSha256: string | null;
+  employerAgent: string;
+  sealedTo: string | null;
+};
+
+async function authedFetch(url: string, init?: RequestInit): Promise<Response> {
   const token = await firebaseAuth.currentUser?.getIdToken();
-  return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  return fetch(url, {
+    ...init,
+    headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+  });
 }
 
 function when(value: string | null): string {
@@ -245,20 +290,130 @@ function AgentRow({ agent }: { agent: AgentCard }) {
   );
 }
 
+function MissionReceipt({ outcome }: { outcome: ApplyOutcome }) {
+  if (!outcome.ok) {
+    return (
+      <div className="mission-chat is-fault" role="status">
+        <p className="mission-bubble is-agent">I paused this introduction. Nothing was sent.</p>
+        <p className="mission-bubble is-employer">{outcome.error ?? 'The secure route was unavailable.'}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`mission-chat ${outcome.accepted ? 'is-accepted' : 'is-refused'}`} role="status">
+      <p className="mission-bubble is-agent">Application encrypted and delivered.</p>
+      <p className="mission-bubble is-employer">
+        {outcome.accepted
+          ? 'Received. Your introduction is now in the employer queue.'
+          : outcome.reasons[0] ?? 'I could not accept this introduction.'}
+      </p>
+      <details className="agent-proof">
+        <summary>
+          <LockKeyhole size={13} aria-hidden="true" /> Show crypto proof
+          <ChevronRight size={13} aria-hidden="true" />
+        </summary>
+        <div className="agent-proof-card">
+          <p><span>Envelope</span><code>{outcome.jti ?? 'not minted'}</code></p>
+          <p><span>Sealed to</span><code>{outcome.sealedTo ?? 'unavailable'}</code></p>
+          <p><span>Ciphertext digest</span><code>{outcome.ciphertextSha256 ?? 'not returned'}</code></p>
+          {outcome.messageId ? <p><span>Employer mailbox</span><code>message {outcome.messageId}</code></p> : null}
+          <small>The application body is never stored in this receipt.</small>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function CompanyMission({
+  match,
+  index,
+  ready,
+  already,
+  skipped,
+  pending,
+  outcome,
+  onApply,
+  onSkip,
+}: {
+  match: Match;
+  index: number;
+  ready: boolean;
+  already: boolean;
+  skipped: boolean;
+  pending: boolean;
+  outcome?: ApplyOutcome;
+  onApply: () => void;
+  onSkip: () => void;
+}) {
+  const company = match.company?.trim() || 'Employer';
+  const fit = Math.round(match.score * 100);
+  const sent = already || outcome?.accepted === true;
+
+  return (
+    <article className={`company-mission mission-tone-${(index % 5) + 1}${skipped ? ' is-skipped' : ''}${sent ? ' is-sent' : ''}`}>
+      <div className="mission-topline">
+        <span className="mission-company-mark" aria-hidden="true">{company.charAt(0).toUpperCase()}</span>
+        <div>
+          <p className="mission-kicker">Company mission {index + 1}</p>
+          <h3>{company}</h3>
+        </div>
+        <strong className="mission-fit"><span>{fit}</span> fit</strong>
+      </div>
+
+      <div className="mission-role">
+        <Building2 size={16} aria-hidden="true" />
+        <div>
+          <strong>{match.title ?? 'Matched opportunity'}</strong>
+          <span>{match.location ?? 'Location flexible'}</span>
+        </div>
+      </div>
+      {match.reason ? <p className="mission-reason">{match.reason}</p> : null}
+
+      {outcome ? <MissionReceipt outcome={outcome} /> : null}
+
+      <div className="mission-actions">
+        <button
+          type="button"
+          className="mission-button is-primary"
+          disabled={!ready || pending || sent || skipped}
+          onClick={onApply}
+        >
+          {pending ? <><Loader2 size={15} className="spin" aria-hidden="true" /> Encrypting…</> : sent ? <><Check size={15} aria-hidden="true" /> Introduced</> : <><Send size={15} aria-hidden="true" /> Approve &amp; send</>}
+        </button>
+        <button type="button" className="mission-button is-quiet" disabled={pending || sent} onClick={onSkip}>
+          {skipped ? <><Undo2 size={14} aria-hidden="true" /> Bring back</> : 'Not for me'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
 export function AgentMenu() {
   const [data, setData] = useState<Payload | null>(null);
+  const [applyContext, setApplyContext] = useState<ApplyContext | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [view, setView] = useState<View>('line');
   const [error, setError] = useState<string | null>(null);
+  const [missionError, setMissionError] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  const [outcomes, setOutcomes] = useState<Record<string, ApplyOutcome>>({});
+  const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
 
   const load = useCallback(async () => {
     setError(null);
-    const response = await authedFetch('/api/a2a');
+    setMissionError(null);
+    const [response, applyResponse] = await Promise.all([
+      authedFetch('/api/a2a'),
+      authedFetch('/api/a2a/apply'),
+    ]);
     if (!response.ok) {
       setError('Could not load the agent roster.');
       return;
     }
     setData((await response.json()) as Payload);
+    if (applyResponse.ok) setApplyContext((await applyResponse.json()) as ApplyContext);
+    else setMissionError('Your company missions could not be loaded right now.');
   }, []);
 
   useEffect(() => {
@@ -286,6 +441,35 @@ export function AgentMenu() {
     return data.feed.filter((entry) => entry.decision === filter);
   }, [data, filter]);
 
+  const missions = useMemo(() => {
+    const companies = new Set<string>();
+    return (applyContext?.matches ?? []).filter((match) => {
+      const key = (match.company ?? match.job_id).trim().toLowerCase();
+      if (companies.has(key)) return false;
+      companies.add(key);
+      return true;
+    }).slice(0, 5);
+  }, [applyContext]);
+
+  const apply = useCallback(async (jobId: string) => {
+    setPending(jobId);
+    setMissionError(null);
+    try {
+      const response = await authedFetch('/api/a2a/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId }),
+      });
+      const outcome = (await response.json()) as ApplyOutcome;
+      setOutcomes((current) => ({ ...current, [jobId]: outcome }));
+      await load();
+    } catch {
+      setMissionError('The secure introduction could not be completed. Nothing new was sent.');
+    } finally {
+      setPending(null);
+    }
+  }, [load]);
+
   if (error && !data)
     return (
       <p className="auth-error" role="alert">
@@ -303,20 +487,34 @@ export function AgentMenu() {
 
   const { self, registered, alumni, unregistered, trail, defences, rank } = data;
   const pct = Math.round((rank.seen / Math.max(rank.total, 1)) * 100);
+  const ready = Boolean(
+    applyContext &&
+    applyContext.missing.length === 0 &&
+    applyContext.ourFingerprint &&
+    applyContext.employer &&
+    !applyContext.employer.revokedAt,
+  );
+  const introduced = missions.filter((match) =>
+    applyContext?.sent.some((attempt) => attempt.jobId === match.job_id && attempt.accepted) ||
+    outcomes[match.job_id]?.accepted,
+  ).length;
+  const questPct = Math.round((introduced / Math.max(missions.length, 1)) * 100);
 
   return (
     <>
       <section className="agent-console" aria-labelledby="secure-line-h">
         <div className="agent-console-glow" aria-hidden="true" />
         <div className="agent-console-copy">
-          <span className="agent-live"><span /> encrypted network online</span>
-          <h2 id="secure-line-h">Watch your agents work.</h2>
-          <p>Introductions, checks, and decisions—shown like a conversation. The private message stays sealed.</p>
+          <span className="agent-live"><span /> your agent is ready</span>
+          <h2 id="secure-line-h">Today&rsquo;s opportunity quest</h2>
+          <p>Choose the companies worth your time. Your agent handles the secure introduction and brings the receipt back here.</p>
+          <div className="agent-quest-progress"><span style={{ width: `${questPct}%` }} /></div>
+          <small>{introduced} of {missions.length || 5} introductions complete</small>
         </div>
-        <div className="agent-console-score" aria-label={`${trail.accepted} accepted exchanges`}>
-          <Sparkles size={18} aria-hidden="true" />
+        <div className="agent-console-score" aria-label={`${trail.accepted} safe exchanges`}>
+          <Flame size={18} aria-hidden="true" />
           <strong>{trail.accepted}</strong>
-          <span>safe exchanges</span>
+          <span>secure wins</span>
         </div>
         <div className="agent-view-tabs" role="tablist" aria-label="Agent console views">
           <button type="button" role="tab" aria-selected={view === 'line'} onClick={() => setView('line')}>
@@ -329,6 +527,56 @@ export function AgentMenu() {
             <ShieldCheck size={16} aria-hidden="true" /> Safety <span>{rank.seen}/{rank.total}</span>
           </button>
         </div>
+      </section>
+
+      <section className="mission-board" aria-labelledby="missions-h">
+        <header className="mission-board-head">
+          <div>
+            <span className="mission-board-eyebrow"><Zap size={14} aria-hidden="true" /> Best matches first</span>
+            <h2 id="missions-h">Pick your next introduction</h2>
+            <p>One strong role from each company. Nothing leaves until you approve it.</p>
+          </div>
+          <span className="mission-count">{missions.length}/5 ready</span>
+        </header>
+
+        {missionError ? <p className="auth-error" role="alert">{missionError}</p> : null}
+        {applyContext?.missing.length ? (
+          <p className="mission-lock-note">
+            <LockKeyhole size={15} aria-hidden="true" /> Complete {applyContext.missing.join(' and ')} before your agent can make an introduction.
+          </p>
+        ) : null}
+
+        {missions.length ? (
+          <div className="mission-grid">
+            {missions.map((match, index) => (
+              <CompanyMission
+                key={match.job_id}
+                match={match}
+                index={index}
+                ready={ready}
+                already={Boolean(applyContext?.sent.some((attempt) => attempt.jobId === match.job_id && attempt.accepted))}
+                skipped={skipped.has(match.job_id)}
+                pending={pending === match.job_id}
+                outcome={outcomes[match.job_id]}
+                onApply={() => void apply(match.job_id)}
+                onSkip={() => setSkipped((current) => {
+                  const next = new Set(current);
+                  if (next.has(match.job_id)) next.delete(match.job_id);
+                  else next.add(match.job_id);
+                  return next;
+                })}
+              />
+            ))}
+          </div>
+        ) : applyContext ? (
+          <div className="mission-empty">
+            <Sparkles size={22} aria-hidden="true" />
+            <h3>Your agent is scouting.</h3>
+            <p>Upload or refresh your resume and new company missions will appear here.</p>
+          </div>
+        ) : (
+          <p className="muted"><Loader2 size={14} className="spin" aria-hidden="true" /> Loading today&rsquo;s missions…</p>
+        )}
       </section>
 
       {view === 'safety' ? <section className="ws-section agent-view-panel" aria-labelledby="defence-h">
