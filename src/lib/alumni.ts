@@ -279,7 +279,7 @@ export async function alumniRoster(
   userId: string,
   major: string,
   track: string | null,
-  limit = 16,
+  limit = 32,
 ): Promise<AlumniAgent[]> {
   const stats = await cohortStats(major, track);
 
@@ -306,30 +306,43 @@ export async function alumniRoster(
     internship_count: string | null;
     connected: boolean;
   }>(
-    `SELECT DISTINCT ON (a.first_job_found_via)
-            a.campus_id, a.major, a.track, a.degree_level, a.graduation_year,
-            a.first_job_title, a.first_employer, a.first_employer_industry,
-            a.first_job_region, a.first_job_is_remote, a.months_to_first_job,
-            a.first_job_found_via, a.internship_count,
-            (c.campus_id IS NOT NULL) AS connected
-       FROM alumni a
-       LEFT JOIN alumni_connections c
-              ON c.campus_id = a.campus_id AND c.user_id = $2
-      WHERE a.major = $1 ${trackFilter}
-        AND a.first_destination = 'Employed Full-Time'
-        AND a.first_job_title IS NOT NULL
-        AND a.first_job_title NOT IN ('Not Applicable', 'No Response', '')
-        AND a.first_job_found_via NOT IN ('Not Applicable', 'No Response', '')
-      ORDER BY a.first_job_found_via,
-               CASE WHEN a.months_to_first_job ~ '${NUMERIC_SQL}'
-                    THEN a.months_to_first_job::numeric END NULLS LAST,
-               a.campus_id
+    `WITH ranked AS (
+       SELECT a.campus_id, a.major, a.track, a.degree_level, a.graduation_year,
+              a.first_job_title, a.first_employer, a.first_employer_industry,
+              a.first_job_region, a.first_job_is_remote, a.months_to_first_job,
+              a.first_job_found_via, a.internship_count,
+              (c.campus_id IS NOT NULL) AS connected,
+              row_number() OVER (
+                PARTITION BY a.first_job_found_via
+                ORDER BY CASE WHEN a.months_to_first_job ~ '${NUMERIC_SQL}'
+                              THEN a.months_to_first_job::numeric END NULLS LAST,
+                         a.campus_id
+              ) AS route_rank
+         FROM alumni a
+         LEFT JOIN alumni_connections c
+                ON c.campus_id = a.campus_id AND c.user_id = $2
+        WHERE a.major = $1 ${trackFilter}
+          AND a.first_destination = 'Employed Full-Time'
+          AND a.first_job_title IS NOT NULL
+          AND a.first_job_title NOT IN ('Not Applicable', 'No Response', '')
+          AND a.first_job_found_via NOT IN ('Not Applicable', 'No Response', '')
+     )
+     SELECT campus_id, major, track, degree_level, graduation_year,
+            first_job_title, first_employer, first_employer_industry,
+            first_job_region, first_job_is_remote, months_to_first_job,
+            first_job_found_via, internship_count, connected
+       FROM ranked
+      ORDER BY route_rank,
+               CASE WHEN months_to_first_job ~ '${NUMERIC_SQL}'
+                    THEN months_to_first_job::numeric END NULLS LAST,
+               campus_id
       LIMIT $3`,
     params,
   );
 
-  // DISTINCT ON had to order by the route to pick one per route; the student
-  // wants them fastest-first, so the final ordering happens here. Eight rows.
+  // SQL deals one candidate from every route before a second candidate from
+  // any route. Keep that round-robin order so refresh exposes the next-best
+  // person per route instead of another wall of the same path.
   return rows.map((row) => {
     const base = {
       campusId: row.campus_id,
@@ -355,8 +368,7 @@ export async function alumniRoster(
       advice: adviceFor(base, stats),
       connected: row.connected,
     };
-  })
-    .sort((a, b) => (a.monthsToFirstJob ?? 1e9) - (b.monthsToFirstJob ?? 1e9));
+  });
 }
 
 /** The cohorts a student can pick from — the dataset's own values, not a guess. */

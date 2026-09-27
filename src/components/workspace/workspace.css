@@ -1207,6 +1207,11 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .alumni-connect:disabled { cursor: default; color: var(--muted); background: color-mix(in srgb, currentColor 7%, var(--paper)); box-shadow: none; }
 .alumni-list > li.is-connected .alumni-connect { color: #08785a; background: color-mix(in srgb, #27bd91 12%, var(--paper)); }
 .alumni-list > li.is-celebrating { animation: card-celebrate 800ms cubic-bezier(0.22, 1, 0.36, 1); }
+.alumni-head-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.55rem; }
+.alumni-refresh { display: inline-flex; align-items: center; gap: 0.38rem; min-height: 34px; padding: 0.48rem 0.65rem; border: 1px solid color-mix(in srgb, #f08a2d 30%, var(--line)); border-radius: 11px; color: #8b4d0b; background: linear-gradient(135deg, color-mix(in srgb, #fff0b6 62%, var(--paper)), color-mix(in srgb, #ffd0a0 35%, var(--paper))); font: 720 0.7rem/1 inherit; cursor: pointer; transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease; }
+.alumni-refresh:hover:not(:disabled) { transform: translateY(-2px); filter: saturate(1.12); box-shadow: 0 9px 20px rgb(224 123 36 / 18%); }
+.alumni-refresh:active:not(:disabled) { transform: scale(0.96); }
+.alumni-refresh:disabled { cursor: default; opacity: 0.55; }
 
 .agent-console {
   position: relative;
@@ -1361,6 +1366,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .alumni-speed { position: absolute; top: 0.65rem; right: 0.65rem; padding: 0.28rem 0.42rem; }
   .alumni-card-copy { padding-right: 5.4rem; }
   .alumni-card-foot { align-items: stretch; flex-direction: column; }
+  .alumni-head-actions { align-items: flex-start; flex-direction: column; }
   .alumni-connect { width: 100%; }
   .agent-console { grid-template-columns: 1fr; border-radius: 20px; }
   .agent-console-score { display: none; }
@@ -1378,6 +1384,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 @media (prefers-reduced-motion: reduce) {
   .alumni-list > li,
   .alumni-connect,
+  .alumni-refresh,
   .alumni-question-chips button,
   .agent-view-tabs button,
   .agent-quest-progress span,

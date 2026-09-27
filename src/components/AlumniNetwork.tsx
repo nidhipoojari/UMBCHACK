@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { BriefcaseBusiness, Check, Loader2, LockKeyhole, MessageCircleQuestion, Radio, Send, Shield, Sparkles, Zap } from 'lucide-react';
+import { BriefcaseBusiness, Check, Loader2, LockKeyhole, MessageCircleQuestion, Radio, RefreshCw, Send, Shield, Sparkles, Zap } from 'lucide-react';
 
 import { GameHud } from '@/components/game/GameHud';
 import { useGame } from '@/components/game/useGame';
@@ -106,6 +106,8 @@ export function AlumniNetwork() {
   const [questions, setQuestions] = useState<Record<string, string>>({});
   const [asked, setAsked] = useState<Record<string, string>>({});
   const [phases, setPhases] = useState<Record<string, 'preparing' | 'sealing' | 'waiting'>>({});
+  const [agentPage, setAgentPage] = useState(0);
+  const [refreshingAgents, setRefreshingAgents] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // The game layer is its own feed rather than another field on `data`,
@@ -230,6 +232,18 @@ export function AlumniNetwork() {
     .map((route) => ({ route, count: 0, share: 0 }));
   const allRoutes = [...stats.routes, ...extra];
   const outOfEnergy = feed.game.energy.remaining <= 0;
+  const cardsPerPage = 8;
+  const agentPages = Math.max(1, Math.ceil(agents.length / cardsPerPage));
+  const visibleAgents = agents.slice(
+    (agentPage % agentPages) * cardsPerPage,
+    (agentPage % agentPages) * cardsPerPage + cardsPerPage,
+  );
+
+  function refreshAgents() {
+    setRefreshingAgents(true);
+    setAgentPage((page) => (page + 1) % agentPages);
+    window.setTimeout(() => setRefreshingAgents(false), 420);
+  }
 
   return (
     <>
@@ -279,6 +293,7 @@ export function AlumniNetwork() {
               onChange={(e) => {
                 setMajor(e.target.value);
                 setTrack('');
+                setAgentPage(0);
               }}
             >
               {options.map((o) => (
@@ -288,7 +303,7 @@ export function AlumniNetwork() {
           </label>
           <label>
             Track
-            <select value={track} onChange={(e) => setTrack(e.target.value)}>
+            <select value={track} onChange={(e) => { setTrack(e.target.value); setAgentPage(0); }}>
               <option value="">All tracks</option>
               {tracks.map((t) => (
                 <option key={t}>{t}</option>
@@ -321,7 +336,12 @@ export function AlumniNetwork() {
           <h2 id="agents-h">
             <Radio size={16} aria-hidden="true" /> People who found a way in
           </h2>
-          <span className="muted">one fast path per route</span>
+          <div className="alumni-head-actions">
+            <span className="muted">next-best people by route</span>
+            <button type="button" className="alumni-refresh" onClick={refreshAgents} disabled={refreshingAgents || agents.length <= cardsPerPage}>
+              <RefreshCw size={14} className={refreshingAgents ? 'spin' : ''} aria-hidden="true" /> New cards
+            </button>
+          </div>
         </header>
 
         {error ? (
@@ -331,7 +351,7 @@ export function AlumniNetwork() {
         ) : null}
 
         <ul className="alumni-list">
-          {agents.map((agent) => {
+          {visibleAgents.map((agent) => {
             const justConnected = celebrating === agent.campusId;
             const activeQuestion = questions[agent.campusId] ?? DEFAULT_ALUMNI_QUESTION;
             const phase = phases[agent.campusId];
