@@ -557,10 +557,11 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
    workspace tokens above rather than new ones: this screen is a view of the
    same workspace, and a second palette would read as a different product. */
 
-/* One bar, two screens. The agents page needs exactly this component, and a
-   second implementation under another name would be a second thing to keep in
-   step with the reduced-motion rule at the foot of this block. */
-.alumni-bar,
+/* Now the agents page only. The alumni screen's copy of this bar went with the
+   rank block it belonged to — its replacement lives in game.css, which the
+   component carries itself so it is styled outside WorkspaceShell too. Left as
+   one selector rather than renamed, so a merge with the other worktrees touches
+   as few lines here as possible. */
 .a2a-bar {
   height: 8px;
   border-radius: 999px;
@@ -568,7 +569,6 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   overflow: hidden;
   margin: 0.75rem 0 0.4rem;
 }
-.alumni-bar > span,
 .a2a-bar > span {
   display: block;
   height: 100%;
@@ -713,7 +713,6 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .spin {
     animation: none;
   }
-  .alumni-bar > span,
   .a2a-bar > span {
     transition: none;
   }

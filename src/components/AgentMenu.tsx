@@ -304,12 +304,14 @@ export function AgentMenu() {
         >
           <span style={{ width: `${pct}%` }} />
         </div>
+        {/* Cut from three sentences to a clause. The argument — that this bar
+            is derived from real refusals and cannot be moved by using the app
+            — is made far better by the board below, where a check that has
+            never fired sits visibly at zero. The unclassified count stays
+            because it is a number, and nothing else on the page reports it. */}
         <p className="muted a2a-hint">
-          Counted from the refusal reasons in <code>a2a_audit</code>, not from a score column. A
-          check moves this bar when it actually turns something away — using the app does not.
-          {rank.unclassified > 0
-            ? ` ${rank.unclassified} recorded ${rank.unclassified === 1 ? 'reason matches' : 'reasons match'} none of the checks below, and ${rank.unclassified === 1 ? 'is' : 'are'} still in the trail.`
-            : ''}
+          From refusal reasons in <code>a2a_audit</code>, never a score column.
+          {rank.unclassified > 0 ? ` ${rank.unclassified} unmatched.` : ''}
         </p>
 
         <ul className="ws-stats a2a-stats">
