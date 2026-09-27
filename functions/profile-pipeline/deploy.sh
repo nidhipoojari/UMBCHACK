@@ -55,5 +55,6 @@ if want match-jobs; then
   gcloud run services add-iam-policy-binding job-matcher --project="$PROJECT" --region=us-east1     --member="serviceAccount:$SA" --role=roles/run.invoker --quiet >/dev/null
   gcloud pubsub topics describe jobs-matched --project="$PROJECT" >/dev/null 2>&1 ||
     gcloud pubsub topics create jobs-matched --project="$PROJECT"
+  gcloud pubsub topics add-iam-policy-binding jobs-matched --project="$PROJECT"     --member="serviceAccount:$SA" --role=roles/pubsub.publisher --quiet >/dev/null
   deploy match-jobs matchJobs --trigger-topic=resume-parsed
 fi

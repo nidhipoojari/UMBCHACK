@@ -153,7 +153,11 @@ export async function matchJobs(cloudEvent) {
         ? `Best fit: ${top.title?.trim()} at ${top.company?.trim()}.`
         : 'New postings come in every day, and we will keep looking.',
     );
-    await publish('jobs-matched', 'jobs.matched', { documentId, userId, count: result.matches.length });
+    // The matches are saved and shown by now; a failed announcement is logged,
+    // not allowed to mark them failed.
+    await publish('jobs-matched', 'jobs.matched', { documentId, userId, count: result.matches.length }).catch((error) =>
+      console.error(`Could not publish jobs.matched for ${documentId}:`, error),
+    );
   } catch (error) {
     console.error(`Matching failed for ${documentId}:`, error);
     await db.query(
