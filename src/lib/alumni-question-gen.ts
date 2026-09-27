@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { ALUMNI_QUESTIONS } from '@/lib/alumni-questions';
-import { GeminiError, generateText, parseJsonObject } from '@/lib/gemini';
+import { GeminiError, generateText, parseJsonArray } from '@/lib/gemini';
 
 import type { CohortStats } from '@/lib/alumni';
 
@@ -78,9 +78,13 @@ function validate(parsed: unknown): string[] {
  */
 export async function alumniQuestions(stats: CohortStats): Promise<string[]> {
   try {
-    return validate(parseJsonObject(await generateText(prompt(stats), { model: ALUMNI_QUESTION_MODEL })));
+    return validate(parseJsonArray(await generateText(prompt(stats), { model: ALUMNI_QUESTION_MODEL })));
   } catch (error) {
+    // Logged for the same reason the dialogue logs it: these chips were coming
+    // out as the hardcoded three for a day because of a parser bug here, and a
+    // silent fallback made that look like a model outage nobody could check.
     if (!(error instanceof GeminiError) && !(error instanceof Error)) throw error;
+    console.error(`alumni-questions: falling back: ${error.message}`);
     return fallbackQuestions();
   }
 }

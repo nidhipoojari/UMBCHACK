@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { db } from '@/lib/db';
-import { GeminiError, generateText, parseJsonObject } from '@/lib/gemini';
+import { GeminiError, generateText, parseJsonArray } from '@/lib/gemini';
 
 /**
  * The conversation the two agents hold about one role.
@@ -133,8 +133,10 @@ ${edu || '- (none recorded)'}
 
 RULES
 - Exactly ${TURN_PAIRS} exchanges: employer asks, applicant answers, ${TURN_PAIRS} times.
-- The employer's questions must come from the posting above — screen for what it actually asks for.
+- THE EMPLOYER IS INTERROGATING FIT, not collecting a CV. Do not ask "what is their background", "what skills do they have" or "what is their education" — all of that is already on the profile above, and asking for it wastes the exchange. Ask why this person suits THIS posting: which requirement they meet and on what evidence, how their experience transfers, what the posting demands that they may not have, which of two listed skills is the deeper one.
+- Every employer question must be answerable only by looking at the specific posting and this specific profile. If the question would make equal sense for any other candidate or any other role, it is the wrong question.
 - The applicant's answers must come ONLY from the facts above. Do not invent an employer, a project, a number, a year or a skill that is not listed.
+- The applicant's agent ARGUES the fit from those facts — it connects a listed skill or role to a demand in the posting rather than restating the list.
 - If the posting asks for something the candidate's facts do not cover, the applicant's agent must say so plainly — "that is not on their profile" — and offer the nearest thing that IS listed. A candid gap is the useful answer; a fabricated match is worthless to both sides.
 - Each message is at most two sentences and under ${MAX_BODY} characters.
 - These are agents talking about a person, not the person talking. Third person.
@@ -244,12 +246,18 @@ export async function ensureDialogue(userId: string, jobId: string): Promise<Dia
   let turns: { speaker: 'employer' | 'applicant'; body: string }[];
   let origin: 'gemini' | 'fallback' = 'gemini';
   try {
-    turns = validate(parseJsonObject(await generateText(prompt(grounding), { model: DIALOGUE_MODEL })));
+    turns = validate(parseJsonArray(await generateText(prompt(grounding), { model: DIALOGUE_MODEL })));
   } catch (error) {
-    // A model failure degrades the conversation, it does not remove it. The
-    // origin column records which path ran, so a thin transcript is explicable
-    // later rather than looking like the model simply had little to say.
+    // SAY WHY. The first version of this caught and fell back in silence, and
+    // every conversation on the site came out identical for a day while the
+    // logs showed nothing at all — the failure was a parser bug on our side,
+    // not a model outage, and nothing on the box could have told anyone that.
+    // A fallback that does not explain itself is indistinguishable from a
+    // model with little to say.
     if (!(error instanceof GeminiError) && !(error instanceof Error)) throw error;
+    console.error(
+      `agent-dialogue: falling back for job ${jobId}: ${error.message}`,
+    );
     turns = fallbackTurns(grounding);
     origin = 'fallback';
   }
