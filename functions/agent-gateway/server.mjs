@@ -3,9 +3,9 @@
  * gateway.mjs so it can be exercised by the attack battery without a socket.
  */
 import { createServer } from 'node:http';
-import { handleInbound } from './lib/gateway.mjs';
+import { authorizeRead, handleInbound } from './lib/gateway.mjs';
 import { loadAgentPrivateKeyPem } from './lib/agent-key.mjs';
-import { fingerprint } from './lib/envelope.mjs';
+import { AUTH_SCHEME, READ_SCOPE, fingerprint } from './lib/envelope.mjs';
 import { publicKeyPemFrom } from './lib/sealing.mjs';
 import { query } from './lib/db.mjs';
 import { readFile } from 'node:fs/promises';
@@ -22,8 +22,8 @@ const OUR_PRIVATE_KEY_PEM = loadAgentPrivateKeyPem();
 const OUR_PUBLIC_KEY_PEM = publicKeyPemFrom(OUR_PRIVATE_KEY_PEM);
 
 const server = createServer(async (req, res) => {
-  const send = (code, body) => {
-    res.writeHead(code, { 'content-type': 'application/json' });
+  const send = (code, body, headers = {}) => {
+    res.writeHead(code, { 'content-type': 'application/json', ...headers });
     res.end(JSON.stringify(body));
   };
 
@@ -33,14 +33,36 @@ const server = createServer(async (req, res) => {
   // resolved: a message referencing a posting we never scanned still shows,
   // with the job fields null, rather than being hidden.
   //
-  // THIS RETURNS OPENED BODIES AND HAS NO CALLER CHECK OF ITS OWN. The sealing
-  // added to /a2a/apply protects a message between the two agents; it stops at
-  // this gateway, and this route hands the plaintext to whoever reaches it. It
-  // is currently fronted by nothing but Cloud Run's own IAM, which is a
-  // deployment setting rather than something this file enforces. Saying so
-  // here because "the messages are encrypted" would otherwise be read as
-  // covering this route, and it does not.
+  // THIS RETURNS OPENED BODIES, SO IT ASKS WHO IS CALLING. A caller must
+  // present `Authorization: A2A <jws>` — an envelope signed by this agent's own
+  // pinned key, addressed to itself, scoped to messages.read and to this route,
+  // with an unused jti. authorizeRead() explains the scheme and what a captured
+  // credential is and is not worth. Refusing by default is the point: the
+  // alternative was Cloud Run IAM, which is a deployment setting rather than
+  // something this file enforces.
+  //
+  // The signed path is the route and not req.url. The handler reads no query
+  // parameters at all — the LIMIT below is fixed and the scoping is to
+  // OUR_NAME — so there is nothing in a query string that could widen what
+  // comes back, and binding the credential to the full URL would only mean
+  // re-signing for a filter that does not exist.
   if (req.method === 'GET' && req.url.startsWith('/messages')) {
+    const auth = await authorizeRead({
+      authorization: req.headers.authorization,
+      ourAgentName: OUR_NAME,
+      path: '/messages',
+    });
+    if (!auth.ok) {
+      // 401 when nothing was offered, 403 when something was and we refused it:
+      // the first is an instruction to authenticate, the second is an answer.
+      // The reasons travel either way, for the same reason a refused message
+      // gets its reasons back.
+      return auth.presented
+        ? send(403, { error: 'read refused', reasons: auth.reasons })
+        : send(401, { error: 'read refused', reasons: auth.reasons }, {
+          'www-authenticate': `${AUTH_SCHEME} realm="${OUR_NAME}", scope="${READ_SCOPE}"`,
+        });
+    }
     const { rows } = await query(
       `SELECT m.message_id, m.received_at, m.kind, m.from_agent, m.from_role,
               m.job_id, m.payload, m.status,

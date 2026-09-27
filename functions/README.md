@@ -75,6 +75,56 @@ opened. Both halves of that are enforced: `hashCiphertext()` throws if handed
 anything that is not already ciphertext, and `a2a_audit_hash_ck` in the schema
 refuses a `payload_hash` that is not a 43-character base64url digest.
 
+## Reading a mailbox
+
+`GET /messages` returns bodies that have been opened, so it asks who is calling.
+It used to ask nobody, which made the confidentiality above a claim that ended
+at our own front door.
+
+A caller presents an `Authorization` header carrying an envelope signed by
+**this agent's own pinned key**, addressed to itself, scoped to `messages.read`
+and to the route:
+
+```
+Authorization: A2A <compact JWS>
+payload:       { "scope": "messages.read", "path": "/messages" }
+iss = aud =    this agent's name          # a mailbox belongs to one agent
+ttl:           60s (plus verify()'s 60s skew allowance — two minutes worst case)
+```
+
+`signReadRequest()` and `readAuthorizationHeader()` in `lib/envelope.mjs` build
+it. No new scheme: the same signature check, the same `a2a_agents` row, the same
+`a2a_seen_envelopes` replay guard as a message delivery. A read with no
+credential gets `401` and a `WWW-Authenticate` header saying what to send; one
+that is presented and refused gets `403`. Either way the reasons come back and
+the refusal lands in `a2a_audit` — a refused read with no readable reason is
+indistinguishable from a bug.
+
+A registered counterparty proving its own identity perfectly is still not this
+agent and gets the same refusal as a stranger. `iss` must equal our own name;
+the check is an equality test, not a membership test against the registry.
+
+**A captured credential** can be presented once, inside its lifetime, before the
+legitimate caller uses it — one read, and a denial of service against the real
+caller, who is then refused as a replay. It cannot be used afterwards (the `jti`
+is burned by whichever arrives first), or after roughly two minutes, or against
+the other deployment (different `aud`), or turned into an application (the scope
+is signed, and `/a2a/apply` refuses an unsealed body). Minting a fresh one needs
+the agent's private key.
+
+Why a header and not a query parameter: a credential in a URL ends up in access
+logs, proxy logs, browser history and `Referer` headers. Why not a bearer token:
+a second identity scheme with its own rotation story, replayable forever once
+captured. Why not mTLS: Cloud Run terminates TLS at its front end, so client
+certificates would need a separate load balancer and a second trust anchor
+beside the fingerprints already pinned here.
+
+**What this does not do:** it does not encrypt the response. The bodies come
+back under TLS and under this check on who may ask; they are not sealed to the
+caller the way an inbound application is sealed to us. The route is not
+advertised on the agent card, because it is an operator route rather than an
+agent-to-agent capability.
+
 ## Private keys are not in this repo
 
 Each registered agent signs with an EC P-256 key whose public half is pinned in
@@ -100,6 +150,19 @@ one with:
 openssl ecparam -name prime256v1 -genkey -noout | openssl pkcs8 -topk8 -nocrypt
 ```
 
+**Each deployment must also register itself.** Its own `a2a_agents` row is the
+pinned key a mailbox read is checked against, so without it `GET /messages`
+refuses every caller and says the fault is ours. `register-agent.mjs` takes the
+public half:
+
+```
+REG_AGENT_NAME=agent://v1.employer.agenthire.biz \
+REG_AGENT_ROLE=employer \
+REG_AGENT_ENDPOINT=https://agenthire.biz/a2a/apply \
+REG_AGENT_PUBKEY_B64=$(openssl ec -in agent.key -pubout | base64 -w0) \
+node register-agent.mjs
+```
+
 ## Running the tests
 
 `agent-gateway` has an adversarial battery that needs no database, no network
@@ -111,9 +174,14 @@ cd functions/agent-gateway && node test/attack-battery.mjs
 
 It asserts the refusals — impersonation, tampering, `alg: none`, wrong
 audience, expiry, off-domain endpoints, lookalike domains, revoked
-registrations, unscored trust dimensions, and for the sealed body: tampered
+registrations, unscored trust dimensions; for the sealed body: tampered
 ciphertext, a wrong-key decrypt, a ciphertext lifted into another envelope, a
-truncated GCM tag, an off-curve ephemeral key, and a plaintext-body downgrade.
+truncated GCM tag, an off-curve ephemeral key, and a plaintext-body downgrade;
+and for mailbox reads: an unauthenticated read, a read signed by another
+registered agent, our own name signed by the wrong key, a replayed credential,
+one scoped to another route or without the scope at all, an expired one, a
+credential for the other deployment, a read against a revoked registration, and
+an application envelope presented as a read credential (and the reverse).
 
 The gateway pipeline runs end to end against an in-memory stand-in for its four
 tables. That stand-in replaces **storage, not policy**: the replay case proves

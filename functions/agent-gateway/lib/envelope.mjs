@@ -183,6 +183,44 @@ export function sealAndSign({
 }
 
 /**
+ * A READ CREDENTIAL. The same envelope, proving the same thing by the same
+ * key, for a request that has no body to sign.
+ *
+ * WHY THE PAYLOAD IS NOT SEALED. Sealing hides a body from the path. A read
+ * request has no body worth hiding — it says "let me read my own mailbox",
+ * which is what every read says. Encrypting a constant would be ceremony, and
+ * this file's whole point is not to perform security it is not providing. What
+ * the payload does carry is the scope and the route, because those must be
+ * signed: see the cross-protocol note in gateway.authorizeRead().
+ *
+ * WHY 60 SECONDS RATHER THAN THE 120 AN ENVELOPE USUALLY GETS. A message is a
+ * thing being delivered and may be retried; a read credential is a key to a
+ * mailbox, and its entire risk is the window in which a captured one still
+ * works. verify() grants every envelope a further 60s of clock-skew
+ * allowance, so the true worst case is two minutes, not one — stated because
+ * a comment that said "good for 60 seconds" would be wrong.
+ */
+export const READ_SCOPE = 'messages.read';
+export const AUTH_SCHEME = 'A2A';
+
+export function signReadRequest({ agentName, path, privateKeyPem, ttlSeconds = 60 }) {
+  // iss and aud are both the agent itself, which looks odd and is correct: a
+  // mailbox belongs to an agent, and the only claim being made is "I am that
+  // agent". Keeping aud set means a credential minted for one deployment is
+  // refused by the other, which share an image and differ only by identity.
+  return sign({
+    payload: { scope: READ_SCOPE, path },
+    issuer: agentName,
+    audience: agentName,
+    privateKeyPem,
+    ttlSeconds,
+  });
+}
+
+/** The Authorization header a caller sends. Header, never a query parameter. */
+export const readAuthorizationHeader = jws => `${AUTH_SCHEME} ${jws}`;
+
+/**
  * hashPayload() USED TO LIVE HERE and was what wrote a2a_audit.payload_hash.
  * It is gone deliberately: it would hash whatever it was handed, so with a
  * plaintext body in scope it was one refactor away from putting a digest of a

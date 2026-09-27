@@ -31,7 +31,7 @@
  * step 5 is what makes that unconditional, because a body that was never sealed
  * is refused rather than hashed.
  */
-import { readClaimsUnverified, verify } from './envelope.mjs';
+import { AUTH_SCHEME, READ_SCOPE, readClaimsUnverified, verify } from './envelope.mjs';
 import { hashCiphertext, isSealed, unseal } from './sealing.mjs';
 import { checkAgentRecord, parseAgentName } from './identity.mjs';
 import { evaluateTrust } from './trust.mjs';
@@ -240,4 +240,170 @@ export async function handleInbound({
     accepted: true, agent: record.agent_name, role: senderRole,
     kind, message_id: messageId, jti: claims.jti, ciphertext_sha256: payloadHash,
   };
+}
+
+/** `Authorization: A2A <compact jws>`. Anything else is not a credential. */
+function parseReadAuthorization(header) {
+  // The compact-JWS alphabet plus the two dots. A regex rather than a split on
+  // whitespace so that a header carrying extra parameters, or a second scheme,
+  // is refused outright instead of being partly understood.
+  const m = new RegExp(`^${AUTH_SCHEME}\\s+([A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+)$`, 'i')
+    .exec(String(header ?? '').trim());
+  return m ? m[1] : null;
+}
+
+/**
+ * authorizeRead — who may read this agent's mailbox.
+ *
+ * THE PROBLEM THIS EXISTS FOR. handleInbound seals an application against
+ * everyone on the path between two agents. GET /messages then served every
+ * opened body to anyone who could reach the route, which made the sealing a
+ * claim that ended at our own front door. Documenting that was honest and was
+ * still the wrong behaviour.
+ *
+ * WHAT A CALLER MUST PRESENT. An `Authorization: A2A <jws>` header carrying an
+ * envelope signed by THIS agent's own pinned key, addressed to itself, scoped
+ * to `messages.read` and to the route being read, with a jti that has not been
+ * used. Not a new scheme: the same signature check, the same a2a_agents row,
+ * the same replay table as a message delivery.
+ *
+ * WHY iss MUST EQUAL ourAgentName. A mailbox belongs to one agent and the only
+ * claim being made is "I am that agent". A registered *counterparty* proving
+ * its own identity perfectly is still not this agent, and gets the same refusal
+ * as a stranger — which is why the check below is an equality test against our
+ * own name and not a membership test against the registry.
+ *
+ * WHY A HEADER AND NOT A QUERY PARAMETER. A credential in a URL ends up in
+ * access logs, proxy logs, browser history and Referer headers — the exact
+ * places a credential must not be, and the reason this route needed fixing.
+ *
+ * WHY NOT A BEARER TOKEN OR SHARED SECRET. It would be a second identity
+ * scheme beside the one in a2a_agents, with its own distribution and rotation
+ * story, and a bearer credential replays forever once captured. The P-256 keys
+ * already exist, already rotate with an UPDATE, and already have a replay guard.
+ *
+ * WHY NOT mTLS. Cloud Run terminates TLS at its front end, so client
+ * certificates would need a separate load balancer in front of it and a second
+ * trust anchor beside the fingerprints already pinned here.
+ *
+ * WHY NOT MAKE THE ROUTE A POST SO THERE IS A BODY TO SIGN. A read is safe and
+ * idempotent and should stay a GET; turning it into a POST to obtain a signable
+ * body would cost those properties and buy nothing the header does not give.
+ *
+ * WHY THE SCOPE AND PATH ARE IN THE SIGNED PAYLOAD. Without them, any envelope
+ * addressed to this agent would double as a read credential — including an
+ * application captured in flight before it was delivered. The scope claim makes
+ * the two kinds of envelope disjoint in both directions: a read credential has
+ * an unsealed payload, and handleInbound refuses an unsealed body.
+ *
+ * WHAT AN ATTACKER WHO CAPTURES ONE OF THESE HEADERS CAN DO. Present it once,
+ * inside its lifetime, and read this mailbox once — and in doing so cause the
+ * legitimate request to be refused as a replay, which is a denial of service
+ * that lands in the audit rather than passing unnoticed.
+ *
+ * WHAT THEY CANNOT DO. Use it after the legitimate request lands, because the
+ * jti is burned by whichever arrives first. Use it more than about two minutes
+ * after capture. Present it to the other gateway deployment, which has a
+ * different `aud`. Turn it into an application, or any other write, because the
+ * scope is signed. Mint a fresh one, which needs the agent's private key. Learn
+ * anything from the header itself, which carries no body.
+ *
+ * WHAT THIS DOES NOT DO. It does not encrypt the response. The bodies come back
+ * under TLS and under this check on who may ask, and they are not sealed to the
+ * caller the way an inbound application is sealed to us.
+ */
+export async function authorizeRead({ authorization, ourAgentName, path, db = defaultDb }) {
+  // `presented` is the 401/403 distinction: nothing offered versus something
+  // offered and refused. Every refusal is audited, because a read refused
+  // without a readable reason is indistinguishable from a bug — the same rule
+  // the message pipeline follows.
+  const refuse = async (reasons, { agentName = null, jti = null, presented = true } = {}) => {
+    await audit(db, {
+      direction: 'inbound', agentName, jti, decision: 'refused', reasons,
+      // A read carries no body, so there is no body to hash. NULL rather than
+      // a digest of the scope claim: payload_hash means one thing, and a column
+      // that sometimes means something else is not an audit trail.
+      payloadHash: null,
+    });
+    return { ok: false, presented, reasons };
+  };
+
+  const jws = parseReadAuthorization(authorization);
+  if (!jws) {
+    return refuse(
+      [`This mailbox requires an ${AUTH_SCHEME} credential: an envelope signed by ${ourAgentName}, scoped to ${READ_SCOPE}.`],
+      { presented: Boolean(String(authorization ?? '').trim()) },
+    );
+  }
+
+  // Untrusted, and used only to decide which row to fetch — the same
+  // bootstrapping problem, and the same rule, as handleInbound step 1.
+  const claimed = readClaimsUnverified(jws);
+  if (!claimed?.iss) return refuse(['Read credential carries no issuer.']);
+
+  if (claimed.iss !== ourAgentName) {
+    return refuse(
+      [`This mailbox belongs to ${ourAgentName}; the credential is signed as ${claimed.iss}.`],
+      { agentName: claimed.iss, jti: claimed.jti },
+    );
+  }
+
+  const { rows } = await db.query('SELECT * FROM a2a_agents WHERE agent_name = $1', [ourAgentName]);
+  const record = rows[0];
+  if (!record) {
+    // Our own name is not in the registry, so there is no pinned key to check a
+    // credential against. Refusing is the only safe reading of that, and the
+    // message says whose fault it is.
+    console.error(`this deployment's agent name ${ourAgentName} is not registered; mailbox reads cannot be authorized`);
+    return refuse(
+      ['This deployment has no registry entry, so a read cannot be authorized against a pinned key. This is a fault on our side.'],
+      { agentName: ourAgentName, jti: claimed.jti },
+    );
+  }
+
+  // Structural checks apply to us too. A revoked registration stops reads as
+  // well as messages, which is the point of revoking one.
+  const structural = checkAgentRecord(record);
+  if (!structural.ok) return refuse(structural.reasons, { agentName: ourAgentName, jti: claimed.jti });
+
+  const verified = verify(jws, {
+    publicKeyPem: record.public_key_pem,
+    expectedIssuer: ourAgentName,
+    expectedAudience: ourAgentName,
+  });
+  if (!verified.ok) return refuse(verified.reasons, { agentName: ourAgentName, jti: claimed.jti });
+  const { claims } = verified;
+
+  const scope = claims.payload?.scope;
+  const forPath = claims.payload?.path;
+  if (scope !== READ_SCOPE) {
+    return refuse(
+      [`This credential is scoped to ${scope ?? 'nothing'}; reading this mailbox requires ${READ_SCOPE}.`],
+      { agentName: ourAgentName, jti: claims.jti },
+    );
+  }
+  if (forPath !== path) {
+    return refuse(
+      [`This credential is scoped to ${forPath ?? 'no route'}, not to ${path}.`],
+      { agentName: ourAgentName, jti: claims.jti },
+    );
+  }
+
+  // Replay, on the same table and by the same mechanism as a delivery: the
+  // INSERT is the check. Claimed last so that a credential refused for any
+  // reason above does not burn a jti the legitimate caller would then be
+  // unable to use.
+  if (!(await claimJti(db, claims.jti, ourAgentName, claims.exp))) {
+    return refuse(['This read credential has already been used once.'], { agentName: ourAgentName, jti: claims.jti });
+  }
+
+  await audit(db, {
+    direction: 'inbound', agentName: ourAgentName, jti: claims.jti, decision: 'accepted',
+    // An accepted read is recorded as what it was. Without this a reader of the
+    // table would have to infer "this row is a read, not a delivery" from
+    // payload_hash being NULL, which is an accident waiting to be relied on.
+    reasons: [`Authorized read of ${path}, scope ${READ_SCOPE}.`],
+    payloadHash: null,
+  });
+  return { ok: true, agent: ourAgentName, jti: claims.jti };
 }

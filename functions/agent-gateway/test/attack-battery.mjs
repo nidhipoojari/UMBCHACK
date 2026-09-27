@@ -18,9 +18,11 @@
  */
 import { generateKeyPairSync } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { sign, sealAndSign, verify, fingerprint } from '../lib/envelope.mjs';
+import {
+  sign, sealAndSign, signReadRequest, readAuthorizationHeader, verify, fingerprint, READ_SCOPE,
+} from '../lib/envelope.mjs';
 import { seal, unseal, isSealed, hashCiphertext, publicKeyPemFrom } from '../lib/sealing.mjs';
-import { handleInbound } from '../lib/gateway.mjs';
+import { authorizeRead, handleInbound } from '../lib/gateway.mjs';
 import { checkAgentRecord } from '../lib/identity.mjs';
 import { evaluateTrust } from '../lib/trust.mjs';
 
@@ -255,7 +257,16 @@ const REGISTRY = {
   revoked_at: null,
 };
 
-function fakeDb() {
+// This deployment's own row. It is in the registry because a mailbox read is
+// checked against a pinned key like anything else — including ours.
+const OURS = {
+  agent_name: US, role: 'employer',
+  endpoint: 'https://agenthire.biz/a2a/apply',
+  public_key_pem: us.pub, key_fingerprint: fingerprint(us.pub),
+  revoked_at: null,
+};
+
+function fakeDb(registry = [REGISTRY, OURS]) {
   const seen = new Set();
   const audits = [];
   const messages = [];
@@ -264,7 +275,7 @@ function fakeDb() {
     messages,
     async query(text, params = []) {
       if (text.includes('FROM a2a_agents')) {
-        return { rows: params[0] === REGISTRY.agent_name ? [REGISTRY] : [] };
+        return { rows: registry.filter(r => r.agent_name === params[0]) };
       }
       if (text.includes('INTO a2a_seen_envelopes')) {
         if (seen.has(params[0])) {
@@ -395,6 +406,135 @@ const inbound = (db, jws, extra = {}) => handleInbound({
   const r = await inbound(db, envelope, { ourPrivateKeyPem: null });
   check('a gateway with no identity key refuses instead of accepting blind', r.accepted === false);
   check('and says the fault is ours', /fault on our side/.test(r.reasons?.[0] ?? ''));
+}
+
+/* ------------------------------------------------------------------ *
+ * mailbox reads — the other end of the same problem.
+ *
+ * Sealing an application on the way in and then serving every opened body from
+ * an unauthenticated GET would mean the confidentiality stopped at our own
+ * front door. A caller must now prove, with the same signature check and the
+ * same pinned key and the same replay table, that it is the agent whose
+ * mailbox it is reading.
+ * ------------------------------------------------------------------ */
+console.log('\nmailbox reads');
+
+const readHeader = (privateKeyPem, { agentName = US, path = '/messages', ttlSeconds } = {}) =>
+  readAuthorizationHeader(signReadRequest({ agentName, path, privateKeyPem, ttlSeconds }));
+
+const readWith = (db, authorization, path = '/messages') =>
+  authorizeRead({ authorization, ourAgentName: US, path, db });
+
+{
+  const db = fakeDb();
+  const header = readHeader(us.priv);
+
+  const ok = await readWith(db, header);
+  check('control: a correctly signed read is authorized', ok.ok === true, JSON.stringify(ok.reasons));
+  check('the authorized read is audited as a read, not as a delivery',
+    db.audits.at(-1).decision === 'accepted' && /messages\.read/.test(db.audits.at(-1).reasons[0]));
+  check('an authorized read writes no payload_hash', db.audits.at(-1).hash === null);
+
+  // REPLAY. The header is a credential; captured off a log or a proxy it is
+  // genuinely signed, genuinely fresh and genuinely ours. The jti is the only
+  // thing standing between it and a second use, and it cannot be changed
+  // without breaking the signature.
+  const again = await readWith(db, header);
+  check('replay: a captured read credential is refused on second use', again.ok === false);
+  check('replay: the refusal says so', /already been used/.test(again.reasons?.[0] ?? ''));
+  check('replay: the refused read is audited', db.audits.at(-1).decision === 'refused');
+}
+
+{
+  const db = fakeDb();
+  const none = await readWith(db, undefined);
+  check('unauthenticated: a read with no credential is refused', none.ok === false);
+  check('unauthenticated: it is reported as nothing presented, for a 401', none.presented === false);
+  check('unauthenticated: the refusal names the scheme it wants',
+    /A2A/.test(none.reasons?.[0] ?? '') && new RegExp(READ_SCOPE).test(none.reasons?.[0] ?? ''));
+  check('unauthenticated: the refusal is audited', db.audits.length === 1 && db.audits[0].decision === 'refused');
+
+  check('an empty Authorization header is refused', !(await readWith(db, '   ')).ok);
+  check('a Bearer token is refused', !(await readWith(db, 'Bearer hunter2')).ok);
+  check('a bare JWS with no scheme is refused', !(await readWith(db, signReadRequest({ agentName: US, path: '/messages', privateKeyPem: us.priv }))).ok);
+  check('a credential with trailing parameters is refused',
+    !(await readWith(db, `${readHeader(us.priv)}, Bearer hunter2`)).ok);
+  check('a presented-but-bad credential is reported as presented, for a 403',
+    (await readWith(db, 'Bearer hunter2')).presented === true);
+}
+
+{
+  // WRONG IDENTITY. THEM is a registered agent in good standing that proves its
+  // own identity perfectly. It is still not US, and gets a stranger's refusal.
+  const db = fakeDb();
+  const asThem = await readWith(db, readHeader(applicant.priv, { agentName: THEM }));
+  check('wrong agent: another registered agent may not read this mailbox', asThem.ok === false);
+  check('wrong agent: the refusal names both agents',
+    asThem.reasons[0].includes(US) && asThem.reasons[0].includes(THEM));
+
+  // Claiming to be US without US's key.
+  const forged = await readWith(db, readHeader(attacker.priv, { agentName: US }));
+  check('forged: our name signed by another key is refused', forged.ok === false);
+  check('forged: it fails on the signature, not on the name',
+    /Signature does not verify/.test(forged.reasons?.[0] ?? ''));
+
+  check('every one of these refusals is audited', db.audits.every(a => a.decision === 'refused'));
+}
+
+{
+  // CROSS-PROTOCOL. The two kinds of envelope must not be interchangeable in
+  // either direction, or an application captured in flight would double as a
+  // key to the mailbox it was addressed to.
+  const db = fakeDb();
+  const application = sealAndSign({
+    plaintext: BODY, issuer: THEM, audience: US,
+    privateKeyPem: applicant.priv, recipientPublicKeyPem: us.pub,
+  });
+  check('an application envelope is not a read credential',
+    !(await readWith(db, readAuthorizationHeader(application))).ok);
+
+  // An envelope this agent signed to itself, but for some other purpose.
+  const unscoped = sign({ payload: { anything: true }, issuer: US, audience: US, privateKeyPem: us.priv });
+  const noScope = await readWith(db, readAuthorizationHeader(unscoped));
+  check('an envelope without the read scope is refused', noScope.ok === false);
+  check('the refusal names the missing scope', new RegExp(READ_SCOPE).test(noScope.reasons?.[0] ?? ''));
+
+  // Scoped to a different route.
+  const elsewhere = await readWith(db, readHeader(us.priv, { path: '/audit' }));
+  check('a credential scoped to another route is refused', elsewhere.ok === false);
+  check('the refusal names the route it was scoped to', /\/audit/.test(elsewhere.reasons?.[0] ?? ''));
+
+  // And the other direction: a read credential is an unsealed body, which
+  // handleInbound already refuses.
+  const asMessage = await inbound(db, sign({
+    payload: { scope: READ_SCOPE, path: '/messages' },
+    issuer: THEM, audience: US, privateKeyPem: applicant.priv,
+  }));
+  check('a read credential is not an application', asMessage.accepted === false);
+
+  check('none of the refused reads burned a jti the real caller needs',
+    (await readWith(fakeDb(), readHeader(us.priv))).ok === true);
+}
+
+{
+  // Expiry, and the registry conditions that stop a read.
+  const db = fakeDb();
+  check('an expired read credential is refused',
+    !(await readWith(db, readHeader(us.priv, { ttlSeconds: -300 }))).ok);
+  check('a credential addressed to the other deployment is refused',
+    !(await readWith(db, readAuthorizationHeader(sign({
+      payload: { scope: READ_SCOPE, path: '/messages' },
+      issuer: US, audience: THEM, privateKeyPem: us.priv,
+    })))).ok);
+
+  const revoked = fakeDb([REGISTRY, { ...OURS, revoked_at: new Date() }]);
+  check('a revoked registration stops reads as well as messages',
+    !(await readWith(revoked, readHeader(us.priv))).ok);
+
+  const unregistered = fakeDb([REGISTRY]);
+  const noRow = await readWith(unregistered, readHeader(us.priv));
+  check('no pinned key for our own name means no read', noRow.ok === false);
+  check('and it says the fault is ours', /fault on our side/.test(noRow.reasons?.[0] ?? ''));
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`);

@@ -42,6 +42,11 @@ CREATE INDEX IF NOT EXISTS a2a_seen_expiry_idx ON a2a_seen_envelopes (expires_at
 --   table outlives the message it describes and is read by more people than the
 --   message is, so it is the one place where "we kept a copy of the
 --   application" must not be able to become true by accident.
+--
+--   It also records READS of the mailbox, accepted and refused. Those carry no
+--   body, so payload_hash is NULL for them and `reasons` says what the read
+--   was — an accepted row that names its scope, rather than leaving a reader of
+--   this table to infer "this was a read" from a null column.
 CREATE TABLE IF NOT EXISTS a2a_audit (
   audit_id     BIGSERIAL PRIMARY KEY,
   occurred_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
