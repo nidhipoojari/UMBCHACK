@@ -47,13 +47,13 @@ Two rules shaped every decision:
 
 | Track | What we built for it |
 |---|---|
-| **Overall** | A full product: resume intake → enrichment → job matching → drafting → verified agent-to-agent apply, with voice on top |
+| **Overall** | A full product: resume intake → enrichment → job matching → gap interview → drafting → verified agent-to-agent apply → a live voice **mock interview** for roles you reach, with a voice agent on every page |
 | **DoIT: Navigating the Future: Career Pathways & Degree ROI** | The hackUMBC alumni and campus dataset loaded into Postgres; a **coursework twin** for every applicant (one dataset student's transcript, matched to their resume, shown on Profile and counted when real job postings are ranked); an alumni network built on it; and a spoken **gap interview** that compares the student's skills and coursework with what real postings ask for |
 | **CyberDawgs Cybersecurity Application** | The A2A gateway: ES256-signed envelopes, ECDH + AES-256-GCM sealing, replay protection, a trust index and an offline attack battery. *Requires the extensive documentation in the [trust protocol](#-the-agent-to-agent-trust-protocol) section and `functions/README.md`* |
 | **Best Entrepreneurial Idea** | A two-sided product for students and employers, where verified identity is the moat |
 | **STARS: Community Impact & Social Innovation** | Built for UMBC students and the Baltimore-area employers who hire them: introductions to alumni who already got the job, protection from fake postings, and skills from coursework that resumes leave out. See [community impact](#-community-impact-umbc--baltimore) for the need, the impact and how we would measure it |
-| **Most Engaging Demo** | Tap the agent's face and it introduces itself out loud; on the dashboard, drag the floating agent anywhere, press its mic nose and ask *"what are my top matches?"*; then watch it refuse an employer that cannot prove who it is |
-| **MLH: Best Use of Gemini API** | Gemini runs the resume extraction, the enrichers, match reranking, document drafting, autofill planning and the agent's tool loop, which answers questions about your own profile, matches, pipeline and coursework through function calls and decides for itself when a conversation is over |
+| **Most Engaging Demo** | Tap the agent's face and it introduces itself out loud; on the dashboard, drag the floating agent anywhere, press its mic nose and ask *"what are my top matches?"*; then watch it refuse an employer that cannot prove who it is; move a role to Interviewing and rehearse with a **live voice interviewer** |
+| **MLH: Best Use of Gemini API** | Gemini runs the resume extraction, the enrichers, match reranking, document drafting, autofill planning and the agent's tool loop, which answers questions about your own profile, matches, pipeline and coursework through function calls and decides for itself when a conversation is over. **Gemini Live** (native audio) is the mock interviewer, and Gemini writes the grounded conversation between your agent and the employer's |
 | **MLH: Best Use of ElevenLabs** | agentHire's voice: a saved intro clip on the landing page, a spoken **gap interview** on the Jobs page, and a **floating voice agent** on every dashboard page you can talk to hands-free (Scribe speech-to-text + Flash text-to-speech) |
 
 ---
@@ -99,13 +99,15 @@ Two rules shaped every decision:
 | 🧰 **Job toolbox** | Five instant rule-based reads of a posting, plus Gemini drafts (cover letter, answers, resume) behind a **fact gate**: a document that claims something your profile cannot back up cannot be printed. | ✅ |
 | 🏢 **Employer check** | Is this company real? Checks where the posting came from, plus a live HTTPS handshake to the company's domain. | ✅ |
 | ✍️ **Autofill (never submits)** | Gemini plans the answers, and a Playwright worker on Cloud Run fills the real Greenhouse, Lever or Ashby form and returns a screenshot. Submission is disabled at deploy time. | ✅ |
-| 📋 **Pipeline board** | Seven stages (saved → applied → interviewing → offer → accepted, rejected, withdrawn), stored as events rather than overwritten status. | ✅ |
+| 📋 **Pipeline board** | Seven stages (saved → applied → interviewing → offer → accepted, rejected, withdrawn) as columns across the page, stored as events rather than overwritten status. Change a role's stage from its card; save a role straight from the Jobs list. Roles at Interviewing or Offer get a **Start interview** button. | ✅ |
 | 🔐 **Verified agent-to-agent apply** | Applying lives in the Agents tab's missions: the applicant agent seals and signs an application to the employer agent, and the employer reads its mailbox with a single-use signed credential. | ✅ |
 | 🕵️ **Agents tab** | The A2A registry and a live audit trail of every envelope: who sent it, whether it verified, and why it was refused if it was. | ✅ |
 | 🎓 **Alumni network** | Alumni matched to the student from the hackUMBC dataset, shown as mission cards, with agent-to-agent introductions. The Agents tab shows each exchange, with the cryptographic evidence one tap deeper. | ✅ |
 | 🎮 **Game layer** | Daily energy, streaks, XP, levels and achievements for reaching out, all derived from existing rows with nothing extra stored. | ✅ |
 | 🎓 **Coursework twin** | While the resume is processing, each applicant is matched to **one** current student from the hackUMBC dataset whose passed courses best fit the resume: same major, then the skills those courses teach (the dataset's 119-tag vocabulary), class level, track and course titles. No model call. It's made once and never changes, even after a new upload, and no student is given to two applicants. Shown on Profile, labelled synthetic, and counted as partial evidence when roles are ranked. Never added to the resume or to anything drafted. | ✅ |
 | 🎤 **Gap interview** | On the Jobs page, the agent counts the skills your matched roles keep asking for that your resume doesn't show, and asks about the top two or three **out loud** (or in a typed form). Gemini turns each answer into a verdict with your own evidence, then only the roles those answers touch are re-scored, each rising by a capped amount. Answers never become resume lines, so the fact gate can't be fooled by a spoken "yes". | ✅ |
+| 🎙️ **Mock interview room** | Rehearse for a role you've reached (Interviewing or Offer): a **live voice interviewer on Gemini Live** asks role-specific questions through a Cloud Run relay (`services/interview-live`) that keeps credentials server-side. The room owns the question order, each answer gets an instant critique, and the session ends with a readout. Every turn is saved to `voice_turns`. A typed and Gemini text-to-speech path covers a missing mic or relay. | ✅ |
+| 🤝 **Agent dialogue** | For a role, your agent and the employer's agent hold a short conversation (up to ten messages, with a follow-up question), written by Gemini from your own profile and the posting's text. Stored apart from the real signed messages (`agent_dialogue`, not `a2a_messages`) and labelled as generated, so a written exchange can never pass for a delivered one. | ✅ |
 | 🗣️ **Floating voice agent** | A draggable 3D agentHire face on every applicant page (it stays put as you switch tabs, like the chat). Press it, or its **mic-shaped nose**, to talk: it greets you, listens hands-free, answers out loud and listens again; press again to mute (a slash appears through the mic) or just say goodbye. Drag it anywhere; it remembers the spot and steps aside when the chat drawer opens. It answers from your own records: profile, top matches, pipeline and coursework. | ✅ |
 | 💬 **Agent chat** | The right-hand chat drawer is the same agent, typed. It shows **one shared conversation**: what you typed, what you said to the floating agent (marked with a microphone), and a line for everything the agent looked up. Ask out loud and follow up in writing, or the other way round. It survives tab changes and reloads. | ✅ |
 | 🎙️ **Voice routes** | ElevenLabs Scribe v2 (speech-to-text) and Flash v2.5 (text-to-speech) behind sign-in and a per-user rate limit, powering the gap interview and the floating agent. | ✅ |
@@ -139,7 +141,7 @@ Two rules shaped every decision:
 
 **Backend & Data**
 - Next.js **Route Handlers**, all behind Firebase ID-token verification (`jose` against Google's JWKS)
-- **Cloud SQL for PostgreSQL** via the Cloud SQL connector and `pg`; 13 SQL migrations
+- **Cloud SQL for PostgreSQL** via the Cloud SQL connector and `pg`; 16 SQL migrations
 - Event-sourced pipeline (`application_events` → `latest_application_state` view)
 - **Cloud Functions gen2** triggered by Eventarc (GCS upload) and **Pub/Sub** (`resume-parsed` → `profile-enriched` / `jobs-matched`)
 - **Playwright** Chromium on Cloud Run for form autofill
@@ -158,7 +160,7 @@ Two rules shaped every decision:
 
 **Cloud & Delivery**
 - **Firebase Hosting** (web frameworks backend) in `us-east1` and **Firebase Auth** (email + Google)
-- **Cloud Run**: agent gateway ×2, job matcher, ATS worker; a Cloud Run **Job** for the scanner
+- **Cloud Run**: agent gateway ×2, job matcher, ATS worker, the **interview-live** relay to Gemini Live (WebSocket, HMAC-signed session tickets); a Cloud Run **Job** for the scanner
 - **Secret Manager** for every credential; **Cloud Storage** with owner-only rules
 - **GitHub Actions** with Workload Identity Federation (no stored keys); a preview channel per PR, live deploy on `main`
 
@@ -269,6 +271,7 @@ Run the battery: `node functions/agent-gateway/test/attack-battery.mjs`. The ful
 | **Text → speech** | `POST /api/voice/tts` | ElevenLabs `eleven_flash_v2_5` in agentHire's voice, with an 800-char cap. The 40 most recent short lines are cached in memory. |
 | **Floating agent** | `FloatingAgent.tsx` + `useVoiceAgent.ts` | Hands-free loop: listen, detect the end of speech from loudness, speech-to-text, `/api/agent`, text-to-speech, listen again. Every turn is written to the shared conversation (`conversation.tsx`) the chat drawer shows. Its greeting, *"Hi, I'm agentHire. Ask me about your job matches, your pipeline, or your profile."*, is a saved clip (`public/agenthire-dashboard-hello.mp3`), so switching it on costs nothing. |
 | **Scripted voice** | `src/components/useVoiceIO.ts` | Speak one line, hear one answer, with the Firebase token attached. The gap interview uses it; stopping part-way drops into the typed form with what was already heard filled in. |
+| **Mock interview** | `services/interview-live` + `/api/interview/[jobId]/*` | The browser streams 16 kHz microphone audio over a WebSocket to the relay, which talks to `gemini-live-2.5-flash-native-audio` on Vertex AI and streams the interviewer's 24 kHz voice back. A connection needs a ticket the web app signed for that one session. Without the relay, questions are read by Gemini text-to-speech and answers transcribed by Gemini. |
 
 Both voice routes require sign-in and are limited to 60 calls per 10 minutes per user, so a runaway loop cannot drain credits.
 
@@ -328,7 +331,8 @@ Wherever colour carries meaning, the same state also has an icon and a text labe
 │   ├── job-scanner/                 Board sweeper (Cloud Run Job)
 │   └── job-matcher/                 Skill + title matcher (Cloud Run)
 ├── services/ats-worker/             Playwright autofill (Cloud Run, private)
-├── sql/                             001–009 Postgres migrations
+├── services/interview-live/         Mock-interview relay to Gemini Live (Cloud Run, WebSocket)
+├── sql/                             001–010 Postgres migrations
 ├── public/agenthire-intro.mp3       Saved voice intro
 ├── storage.rules                    Owner-only, PDF-only, 10 MB, no overwrite
 ├── firebase.json                    Hosting with the web frameworks backend
@@ -404,6 +408,11 @@ Every route requires a Firebase ID token (`Authorization: Bearer <token>`). "App
 | `GET·POST /api/gaps` | applicant | GET: the skills the gap interview would cover. POST: start it (up to 3 spoken questions) |
 | `POST /api/gaps/answers` | applicant | Judge the answers, save them on `profile_gaps`, re-score the touched matches (409 if nothing was asked, 429 while a rerank is running) |
 | `POST /api/agent` | signed in | One turn with the agent: career tools, your own profile / matches / pipeline / coursework (by your verified uid, never the model's arguments), and `end_conversation`. Returns `{ reply, toolCalls, end? }` |
+| `GET /api/interview/[jobId]/session` | applicant | Everything the interview room needs (locked unless the role is at Interviewing or Offer) |
+| `POST /api/interview/[jobId]/live` | applicant | A signed ticket and URL for one live call with the interviewer |
+| `POST /api/interview/[jobId]/speak` · `/transcribe` | applicant | A question read aloud by Gemini; a spoken answer transcribed by Gemini |
+| `POST /api/interview/[jobId]/turn` · `/finish` | applicant | Log and critique one answer; end the session and return the readout |
+| `GET·POST /api/agents/dialogue` | applicant | Read, or write once, the agents' generated conversation about one role |
 | `POST /api/voice/stt` · `/tts` | signed in, rate-limited | ElevenLabs speech in and out |
 
 ---
@@ -428,9 +437,10 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 | `/` | Landing page: agent face with voice intro, star field, story, pathways | ✅ |
 | `/signin` · `/signup` | Email or Google; `?role=applicant\|employer` | ✅ |
 | `/applicant/intake/resume` → `/progress` | Upload a PDF, watch the profile build and the coursework twin get matched; Next leads to the gap interview | ✅ |
-| `/applicant` | Overview with your top matches | ✅ |
+| `/applicant` | Redirects to Jobs (the overview now lives there) | ✅ |
 | `/applicant/jobs` · `/jobs/[jobId]` | Matches with the spoken gap interview, and the job page with toolbox, employer check and autofill | ✅ |
-| `/applicant/pipeline` | Seven-stage board | ✅ |
+| `/applicant/pipeline` | Seven stage columns, stage control on each card, **Start interview** for Interviewing / Offer | ✅ |
+| `/applicant/interview/[jobId]` | The mock interview room with the live voice interviewer | ✅ |
 | `/applicant/network` | Alumni network + game HUD | ✅ |
 | `/applicant/agents` | Agent missions (apply, outreach), A2A registry and audit. `/applicant/apply` redirects here | ✅ |
 | `/applicant/profile` · `/account` | Profile facts, the Coursework card, account | ✅ |
@@ -451,6 +461,7 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 
 | When (EDT) | What changed |
 |---|---|
+| Sun Sep 27, ~07:45 | Mock interview room with a live Gemini Live voice interviewer (`services/interview-live`, `voice_turns`); generated agent-to-agent dialogue per role (`agent_dialogue`, up to ten messages with a follow-up); pipeline as stage columns with the stage control on each card; save roles from Jobs; clickable job cards and banded fit scores; Overview folded into Jobs |
 | Sun Sep 27, ~05:20 | Floating voice agent on every applicant page (draggable, mic-nose switch, hands-free, answers from your own profile, matches, pipeline and coursework, ends itself on goodbye); the chat drawer connected to the agent, showing one shared typed + spoken conversation |
 | Sun Sep 27, ~05:15 | README: community impact section for the STARS track (the need, what agentHire does about it, and how a UMBC pilot would measure it from data the app already records); tracks and features described as they work today |
 | Sun Sep 27, ~04:15 | Coursework twin: every applicant matched once to a unique hackUMBC dataset student during resume processing, a Coursework card on Profile, and coursework counted as partial evidence in the gap interview's re-ranking (`coursework_twins`, `009`); apply moved into agent missions |
@@ -468,6 +479,6 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 
 **Live:** [agentHire](https://project-96b6d773-106a-457a-a46.web.app) · **Repo:** [nidhipoojari/UMBCHACK](https://github.com/nidhipoojari/UMBCHACK)
 
-Built at **hackUMBC 2026** by **Nidhi Poojari**, **Tarang Nair** and **Vijay Vanapalli** — Baltimore, MD
+Built at **hackUMBC 2026** by **Nidhi Poojari**, **Tarang Nair**, **Vijay Vanapalli** and **Krutika Raut** — Baltimore, MD
 
 </div>
