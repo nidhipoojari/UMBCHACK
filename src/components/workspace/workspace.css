@@ -1598,3 +1598,22 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 
 /* A spoken turn in the chat drawer: a small microphone after the speaker's name. */
 .vt-via { display: inline-block; margin-left: 6px; vertical-align: -1px; opacity: 0.7; }
+
+/* A match row carries one more control than a plain row: the save button sits
+   after the fit score. Declared on .ws-match rather than widening .ws-row,
+   because every other row in the workspace still has exactly three columns and
+   giving them a fourth would leave a dead gutter on each one. */
+.ws-match {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+@media (max-width: 620px) {
+  /* At phone width the fit score and the save control share the line under the
+     title rather than squeezing the title into a sliver. */
+  .ws-match {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .ws-match > strong {
+    grid-column: 2;
+  }
+}
