@@ -28,6 +28,17 @@
 import { readFileSync } from 'node:fs';
 import { createPrivateKey } from 'node:crypto';
 
+/**
+ * `env` is any record of the two names below, not necessarily process.env. The
+ * parameter was always there for tests; the web tier now uses it to load the
+ * applicant and employer keys from a different pair of variables in one process,
+ * which is why the type is written out — without it a caller in TypeScript is
+ * told to supply a whole ProcessEnv, NODE_ENV and all, for a function that reads
+ * exactly two keys.
+ *
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {string} the PEM, parsed and checked
+ */
 export function loadAgentPrivateKeyPem(env = process.env) {
   const path = env.AGENT_PRIVATE_KEY_FILE;
   const b64 = env.AGENT_PRIVATE_KEY_PEM_B64;
