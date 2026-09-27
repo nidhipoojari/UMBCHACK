@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 /**
  * Real job matches, from the job-matcher service by way of the match-jobs
  * Cloud Function. One caller now: the Jobs page, which is where the headline
@@ -17,6 +19,9 @@ import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 import type { JobMatch, MatchesResponse } from '@/lib/matches';
+import type { PipelineBoard, PipelineStatus } from '@/lib/pipeline-contract';
+import { authedFetch } from '@/lib/authed-fetch';
+import { SavePipelineButton } from './SavePipelineButton';
 
 import { Stats } from './PageHead';
 import { useMatches } from './useMatches';
@@ -70,7 +75,7 @@ function emptyState(data: MatchesResponse | null, error: string | null): React.R
  * which are missing. With that screen gone the flag had one value, so the row
  * simply shows them.
  */
-function MatchRow({ match }: { match: JobMatch }) {
+function MatchRow({ match, stage }: { match: JobMatch; stage: PipelineStatus | null }) {
   const meta = [match.company, match.location, posted(match.posted_at)].filter(Boolean).join(' · ');
   return (
     <li className="ws-row ws-match">
@@ -107,6 +112,13 @@ function MatchRow({ match }: { match: JobMatch }) {
         <span />
       )}
       <strong aria-label={`Fit ${fit(match)} out of 100`}>{fit(match)}</strong>
+      {/* Saving from the list rather than only from the detail page. Deciding
+          to chase a role is a judgement made while scanning — requiring a
+          navigation first meant the cheapest action in the product was the one
+          that cost the most clicks. The button is the same component the job
+          page uses, so a role saved here and a role saved there are one code
+          path and cannot drift. */}
+      <SavePipelineButton jobId={match.job_id} initialStatus={stage} />
     </li>
   );
 }
@@ -118,8 +130,52 @@ function MatchRow({ match }: { match: JobMatch }) {
  * returns them ordered by score — the same assumption the stat tile made on
  * Overview. If that ordering ever changes, this tile is where it shows.
  */
+/**
+ * Which of these roles are already in the pipeline.
+ *
+ * Read from /api/pipeline rather than added to /api/matches, and that is a
+ * deliberate split: the match run is a snapshot produced by a Cloud Function
+ * and cached, while a stage changes the moment the student presses save. Folding
+ * the second into the first would either serve a stale stage from the cache or
+ * force the expensive query to re-run for a fact it does not own.
+ *
+ * A failure here is silent on purpose. Not knowing a stage costs a button that
+ * says "Save" for a role already saved — pressing it is idempotent, since the
+ * stage is an event and saving twice records the same state. Not showing the
+ * matches at all because their stages could not be read would be the far worse
+ * trade.
+ */
+function usePipelineStages(): Map<string, PipelineStatus> {
+  const [stages, setStages] = useState<Map<string, PipelineStatus>>(new Map());
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await authedFetch('/api/pipeline');
+        if (!response.ok) return;
+        const board = (await response.json()) as PipelineBoard;
+        if (cancelled) return;
+        const map = new Map<string, PipelineStatus>();
+        for (const [status, cards] of Object.entries(board.stages ?? {})) {
+          for (const card of cards) map.set(card.job_id, status as PipelineStatus);
+        }
+        setStages(map);
+      } catch {
+        // See above: a missing stage degrades one button, not the page.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return stages;
+}
+
 export function MatchList() {
   const { data, error } = useMatches();
+  const stages = usePipelineStages();
   const empty = emptyState(data, error);
   const matches = data?.matches ?? [];
   const best = matches[0];
@@ -147,7 +203,7 @@ export function MatchList() {
         {empty ?? (
           <ul className="ws-list">
             {matches.map((match) => (
-              <MatchRow key={match.job_id} match={match} />
+              <MatchRow key={match.job_id} match={match} stage={stages.get(match.job_id) ?? null} />
             ))}
           </ul>
         )}
