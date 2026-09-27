@@ -59,27 +59,36 @@ jobs:
           service_account: github-actions-deploy@project-96b6d773-106a-457a-a46.iam.gserviceaccount.com
 
       # Framework-aware Hosting is still behind an opt-in flag. Without this the
-      # next two steps read hosting.source as a config error rather than as
+      # deploy steps read hosting.source as a config error rather than as
       # "build this Next.js app and put its server somewhere".
       - name: Enable framework-aware hosting
         run: npx --yes firebase-tools@15 experiments:enable webframeworks
 
-      # --force is what keeps these steps from exiting 1 after a SUCCESSFUL
-      # deploy. firebase-tools wants to attach an Artifact Registry cleanup
-      # policy so old SSR container images do not accumulate and bill, it
-      # cannot ask under --non-interactive, and it treats not asking as an
-      # error rather than as a skip. --force answers the question in advance.
+      # Without this, both deploy steps below exit 1 AFTER succeeding.
+      # firebase-tools wants an Artifact Registry cleanup policy so the SSR
+      # container images do not accumulate and bill; it cannot ask under
+      # --non-interactive, and it reports not being able to ask as an error
+      # rather than skipping it. Setting the policy answers the question
+      # instead of suppressing it.
+      #
+      # A step of its own because hosting:channel:deploy accepts no flag that
+      # would answer the prompt inline, so the preview path could not do this
+      # for itself even in principle. Re-running it is a no-op.
+      - name: Ensure an image cleanup policy exists
+        run: |
+          npx --yes firebase-tools@15 functions:artifacts:setpolicy \
+            --project "$FIREBASE_PROJECT" --location us-east1 --days 3 --force
 
       # Pull requests get a throwaway preview URL that expires in 7 days.
       - name: Deploy preview
         if: github.event_name == 'pull_request'
         run: |
           npx --yes firebase-tools@15 hosting:channel:deploy "pr-${{ github.event.number }}" \
-            --project "$FIREBASE_PROJECT" --expires 7d --non-interactive --force
+            --project "$FIREBASE_PROJECT" --expires 7d --non-interactive
 
       # Pushes to main go straight to the live site.
       - name: Deploy live
         if: github.event_name != 'pull_request'
         run: |
           npx --yes firebase-tools@15 deploy --only hosting \
-            --project "$FIREBASE_PROJECT" --non-interactive --force
+            --project "$FIREBASE_PROJECT" --non-interactive
