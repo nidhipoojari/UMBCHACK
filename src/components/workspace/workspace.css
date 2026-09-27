@@ -1623,23 +1623,42 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
    Same bubble shapes so it reads as a conversation; different chrome so it is
    never mistaken for delivered mail. */
 .agent-transcript { margin-bottom: 14px; }
+/* SENTENCE CASE, NOT A BANNER. Uppercase plus letter-spacing turned a short
+   label into the widest thing on the panel and made it read as a section
+   banner competing with the conversation under it. It is a caption; it should
+   sit quietly above the thing it captions. */
+.agent-transcript-head {
+  /* Inset to match the chat's own 1rem padding. Flush against the panel edge
+     the icon was half-clipped by the border and the caption hung off a
+     different left edge from the bubbles it describes. */
+  margin: 0;
+  padding: 0.85rem 1rem 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+}
 .agent-transcript h3 {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin: 0 0 8px;
-  font-size: 0.82rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  opacity: 0.6;
-}
-.agent-transcript-note {
-  text-transform: none;
+  gap: 7px;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
   letter-spacing: 0;
-  font-size: 0.78rem;
-  opacity: 0.85;
+  text-transform: none;
+  opacity: 1;
 }
+.agent-transcript h3 > svg { flex: none; opacity: 0.55; }
+
+/* Its own line. Trailing the title inline meant the sentence that distinguishes
+   generated turns from delivered ones was the part most likely to be skipped,
+   which is exactly backwards. */
+.agent-transcript-note {
+  margin: 3px 0 0;
+  padding-left: 21px;
+  font-size: 0.79rem;
+  line-height: 1.4;
+  opacity: 0.7;
+}
+.agent-transcript-note strong { font-weight: 600; opacity: 0.95; }
 /* NOT .is-mine. The shared rule paints an outbound bubble white-on-purple, and
    an earlier version of this override replaced the background without the
    colour -- white text on a near-white panel, invisible. The applicant's turns
@@ -1652,7 +1671,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 /* A generated turn has no receipt, so its bubble has no status line and can be
    tighter than an audit bubble. */
 .agent-transcript .agent-bubble { min-width: 0; }
-.agent-transcript .agent-chat { gap: 1.15rem; padding: 0.85rem 1rem; }
+.agent-transcript .agent-chat { gap: 1.15rem; padding: 0.9rem 1rem 0.85rem; }
 
 /* Each turn lands just after the one above it, so the exchange reads as a
    conversation arriving rather than a block appearing. Six steps is enough for

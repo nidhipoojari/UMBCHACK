@@ -855,14 +855,22 @@ export function AgentMenu() {
 
         {turns.length > 0 || writing ? (
           <section className="agent-transcript" aria-labelledby="transcript-h">
-            <h3 id="transcript-h">
-              <MessageCircle size={13} aria-hidden="true" /> What the agents discussed
-              {/* Said on the screen, not only in a comment. These turns are
-                  written from profile rows and the posting; the receipts below
-                  are delivered traffic. A reader who cannot tell them apart has
-                  been misled by the layout. */}
-              <span className="agent-transcript-note">generated from your profile · not delivered mail</span>
-            </h3>
+            {/* Two lines, not one. The title and the disclaimer were running
+                together into a single wide uppercase run that read as a banner
+                and pushed the note off to where nobody finishes reading it —
+                and the note is the part that must land, since it is what stops
+                a written turn being mistaken for delivered mail. Title first,
+                in sentence case; the caveat directly under it, quiet but
+                whole. */}
+            <header className="agent-transcript-head">
+              <h3 id="transcript-h">
+                <MessageCircle size={14} aria-hidden="true" />
+                What the agents discussed
+              </h3>
+              <p className="agent-transcript-note">
+                Written from your profile and the posting — <strong>not delivered mail</strong>
+              </p>
+            </header>
             {writing && turns.length === 0 ? (
               <p className="muted">
                 <Loader2 size={13} className="spin" aria-hidden="true" /> The agents are talking…
