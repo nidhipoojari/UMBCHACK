@@ -52,9 +52,9 @@ Two rules shaped every decision:
 | **CyberDawgs Cybersecurity Application** | The A2A gateway: ES256-signed envelopes, ECDH + AES-256-GCM sealing, replay protection, a trust index and an offline attack battery. *Requires the extensive documentation in the [trust protocol](#-the-agent-to-agent-trust-protocol) section and `functions/README.md`* |
 | **Best Entrepreneurial Idea** | A two-sided product for students and employers, where verified identity is the moat |
 | **STARS: Community Impact & Social Innovation** | Built for UMBC students and the Baltimore-area employers who hire them: introductions to alumni who already got the job, protection from fake postings, and skills from coursework that resumes leave out. See [community impact](#-community-impact-umbc--baltimore) for the need, the impact and how we would measure it |
-| **Most Engaging Demo** | Tap the agent's face and it introduces itself out loud, then watch it refuse an employer that cannot prove who it is |
-| **MLH: Best Use of Gemini API** | Gemini runs the resume extraction, the enrichers, match reranking, document drafting, autofill planning and the agent's tool loop |
-| **MLH: Best Use of ElevenLabs** | agentHire's voice: a saved intro clip on the landing page, and a spoken **gap interview** on the Jobs page that asks about missing skills and hears the answers (Scribe speech-to-text + Flash text-to-speech) |
+| **Most Engaging Demo** | Tap the agent's face and it introduces itself out loud; on the dashboard, drag the floating agent anywhere, press its mic nose and ask *"what are my top matches?"*; then watch it refuse an employer that cannot prove who it is |
+| **MLH: Best Use of Gemini API** | Gemini runs the resume extraction, the enrichers, match reranking, document drafting, autofill planning and the agent's tool loop, which answers questions about your own profile, matches, pipeline and coursework through function calls and decides for itself when a conversation is over |
+| **MLH: Best Use of ElevenLabs** | agentHire's voice: a saved intro clip on the landing page, a spoken **gap interview** on the Jobs page, and a **floating voice agent** on every dashboard page you can talk to hands-free (Scribe speech-to-text + Flash text-to-speech) |
 
 ---
 
@@ -106,7 +106,9 @@ Two rules shaped every decision:
 | 🎮 **Game layer** | Daily energy, streaks, XP, levels and achievements for reaching out, all derived from existing rows with nothing extra stored. | ✅ |
 | 🎓 **Coursework twin** | While the resume is processing, each applicant is matched to **one** current student from the hackUMBC dataset whose passed courses best fit the resume: same major, then the skills those courses teach (the dataset's 119-tag vocabulary), class level, track and course titles. No model call. It's made once and never changes, even after a new upload, and no student is given to two applicants. Shown on Profile, labelled synthetic, and counted as partial evidence when roles are ranked. Never added to the resume or to anything drafted. | ✅ |
 | 🎤 **Gap interview** | On the Jobs page, the agent counts the skills your matched roles keep asking for that your resume doesn't show, and asks about the top two or three **out loud** (or in a typed form). Gemini turns each answer into a verdict with your own evidence, then only the roles those answers touch are re-scored, each rising by a capped amount. Answers never become resume lines, so the fact gate can't be fooled by a spoken "yes". | ✅ |
-| 🎙️ **Voice routes** | ElevenLabs Scribe v2 (speech-to-text) and Flash v2.5 (text-to-speech) behind sign-in and a per-user rate limit, powering the spoken gap interview. | ✅ |
+| 🗣️ **Floating voice agent** | A draggable 3D agentHire face on every applicant page (it stays put as you switch tabs, like the chat). Press it, or its **mic-shaped nose**, to talk: it greets you, listens hands-free, answers out loud and listens again; press again to mute (a slash appears through the mic) or just say goodbye. Drag it anywhere; it remembers the spot and steps aside when the chat drawer opens. It answers from your own records: profile, top matches, pipeline and coursework. | ✅ |
+| 💬 **Agent chat** | The right-hand chat drawer is the same agent, typed. It shows **one shared conversation**: what you typed, what you said to the floating agent (marked with a microphone), and a line for everything the agent looked up. Ask out loud and follow up in writing, or the other way round. It survives tab changes and reloads. | ✅ |
+| 🎙️ **Voice routes** | ElevenLabs Scribe v2 (speech-to-text) and Flash v2.5 (text-to-speech) behind sign-in and a per-user rate limit, powering the gap interview and the floating agent. | ✅ |
 | 🧑‍💼 **Employer mailbox** | Applications from verified applicant agents arrive sealed and signed; the employer opens them with a single-use signed credential. | ✅ |
 | 🌌 **Landing page** | A WebGL star field, a 13-beat scroll story (including two "Built for students" beats on the alumni network and the game layer), a cost ledger, a fraud gate and a handshake explainer. | ✅ |
 
@@ -265,6 +267,7 @@ Run the battery: `node functions/agent-gateway/test/attack-battery.mjs`. The ful
 | **Landing intro** | `public/agenthire-intro.mp3` + `AgentGreeter.tsx` | *"Hi, I'm agentHire, your voice-first job agent. I match you to roles and verify every employer first."* Generated once with ElevenLabs, then served as a static file, so **playing it costs nothing**. If the line changes, the clip must be regenerated. |
 | **Speech → text** | `POST /api/voice/stt` | ElevenLabs `scribe_v2`, with a 2 MB cap. |
 | **Text → speech** | `POST /api/voice/tts` | ElevenLabs `eleven_flash_v2_5` in agentHire's voice, with an 800-char cap. The 40 most recent short lines are cached in memory. |
+| **Floating agent** | `FloatingAgent.tsx` + `useVoiceAgent.ts` | Hands-free loop: listen, detect the end of speech from loudness, speech-to-text, `/api/agent`, text-to-speech, listen again. Every turn is written to the shared conversation (`conversation.tsx`) the chat drawer shows. Its greeting, *"Hi, I'm agentHire. Ask me about your job matches, your pipeline, or your profile."*, is a saved clip (`public/agenthire-dashboard-hello.mp3`), so switching it on costs nothing. |
 | **Scripted voice** | `src/components/useVoiceIO.ts` | Speak one line, hear one answer, with the Firebase token attached. The gap interview uses it; stopping part-way drops into the typed form with what was already heard filled in. |
 
 Both voice routes require sign-in and are limited to 60 calls per 10 minutes per user, so a runaway loop cannot drain credits.
@@ -305,10 +308,11 @@ Wherever colour carries meaning, the same state also has an icon and a text labe
 │   │   ├── useVoiceAgent.ts         Hands-free voice loop
 │   │   ├── useVoiceIO.ts            Scripted voice: speak a line, hear an answer
 │   │   ├── Starfield*.tsx           WebGL star field
-│   │   ├── workspace/               Shell, nav, chat drawer, jobs, pipeline, A2A, alumni, coursework
+│   │   ├── workspace/               Shell, nav, chat drawer, floating agent, shared conversation,
+│   │   │                            jobs, pipeline, A2A, alumni, coursework
 │   │   └── game/                    Energy, streak, XP, achievements, level-up
 │   └── lib/
-│       ├── agent/                   Gemini tool loop: client, tools, loop
+│       ├── agent/                   Gemini tool loop: client, tools (career + your own records), loop
 │       ├── artifacts/               Posting reads, drafting, fact gate, print view
 │       ├── match/ · autofill/       Eligibility, skill extraction, autofill evidence
 │       ├── a2a-*.ts                 Applicant/employer agent keys, apply, mailbox
@@ -399,7 +403,7 @@ Every route requires a Firebase ID token (`Authorization: Bearer <token>`). "App
 | `GET·POST /api/coursework` | applicant | GET: the coursework twin's transcript for Profile. POST: match one now if there is none (idempotent; 409 without a parsed resume) |
 | `GET·POST /api/gaps` | applicant | GET: the skills the gap interview would cover. POST: start it (up to 3 spoken questions) |
 | `POST /api/gaps/answers` | applicant | Judge the answers, save them on `profile_gaps`, re-score the touched matches (409 if nothing was asked, 429 while a rerank is running) |
-| `POST /api/agent` | signed in | One turn with the Gemini career agent |
+| `POST /api/agent` | signed in | One turn with the agent: career tools, your own profile / matches / pipeline / coursework (by your verified uid, never the model's arguments), and `end_conversation`. Returns `{ reply, toolCalls, end? }` |
 | `POST /api/voice/stt` · `/tts` | signed in, rate-limited | ElevenLabs speech in and out |
 
 ---
@@ -430,6 +434,7 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 | `/applicant/network` | Alumni network + game HUD | ✅ |
 | `/applicant/agents` | Agent missions (apply, outreach), A2A registry and audit. `/applicant/apply` redirects here | ✅ |
 | `/applicant/profile` · `/account` | Profile facts, the Coursework card, account | ✅ |
+| every `/applicant/*` page | The floating voice agent and the chat drawer, sharing one conversation | ✅ |
 | `/employer/applicants` | Mailbox of verified applications | ✅ |
 
 ---
@@ -446,6 +451,7 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 
 | When (EDT) | What changed |
 |---|---|
+| Sun Sep 27, ~05:20 | Floating voice agent on every applicant page (draggable, mic-nose switch, hands-free, answers from your own profile, matches, pipeline and coursework, ends itself on goodbye); the chat drawer connected to the agent, showing one shared typed + spoken conversation |
 | Sun Sep 27, ~05:15 | README: community impact section for the STARS track (the need, what agentHire does about it, and how a UMBC pilot would measure it from data the app already records); tracks and features described as they work today |
 | Sun Sep 27, ~04:15 | Coursework twin: every applicant matched once to a unique hackUMBC dataset student during resume processing, a Coursework card on Profile, and coursework counted as partial evidence in the gap interview's re-ranking (`coursework_twins`, `009`); apply moved into agent missions |
 | Sun Sep 27, ~03:35 | Landing page speaks to students: two new "Built for students" beats in How it works (alumni network, streaks and XP), student card and feature marquee updated |
