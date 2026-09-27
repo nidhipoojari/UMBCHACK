@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { authedFetch } from '@/lib/authed-fetch';
+
 import type { FaceMood } from './AgentFace';
 
 /**
@@ -19,11 +21,26 @@ import type { FaceMood } from './AgentFace';
  *
  * END OF SPEECH is detected from loudness: a short calibration reads the room,
  * then the turn ends after ~1.3 s of quiet following speech. No push-to-talk.
+ *
+ * SIGNED IN ONLY. Every call carries the Firebase token (authedFetch), because
+ * the voice routes and /api/agent refuse anonymous callers. The agent ends the
+ * conversation itself when it calls end_conversation (`end: true` in its reply).
  */
 
-export const GREETING =
-  "Hi, I'm agentHire. I find jobs that fit your skills and coursework, show you where your degree can take you, " +
-  "and apply for you, but only to employers that can prove they're real. How can I help you today?";
+/** What the agent says first. `src` is a saved clip of the same words, played instead of synthesizing them. */
+export type Greeting = { text: string; src?: string };
+
+export type VoiceToolCall = { name: string; result?: Record<string, unknown> };
+
+export type VoiceAgentOptions = {
+  greeting: Greeting;
+  /** The page the user is on right now, read at each turn so it follows navigation. */
+  page: () => string | null;
+  /** Every spoken turn, as it happens: for a transcript shown elsewhere (the chat drawer). */
+  onTurn?: (role: 'user' | 'agent', text: string, extra?: { toolCalls?: VoiceToolCall[]; end?: boolean }) => void;
+  /** A shared conversation to send to the agent instead of this session's own turns. */
+  history?: () => Turn[];
+};
 
 export type VoicePhase = 'off' | 'thinking' | 'speaking' | 'listening';
 
@@ -66,7 +83,7 @@ const MOOD: Record<VoicePhase, FaceMood> = {
   listening: 'listening',
 };
 
-export function useVoiceAgent() {
+export function useVoiceAgent({ greeting, page, onTurn, history: sharedHistory }: VoiceAgentOptions) {
   const [phase, setPhase] = useState<VoicePhase>('off');
   const [caption, setCaption] = useState<Caption | null>(null);
 
@@ -76,6 +93,17 @@ export function useVoiceAgent() {
   const source = useRef<AudioBufferSourceNode | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
   const history = useRef<Turn[]>([]);
+  // Held in refs so start() keeps a stable identity while the page changes under it.
+  const greetingRef = useRef(greeting);
+  const pageRef = useRef(page);
+  const onTurnRef = useRef(onTurn);
+  const sharedRef = useRef(sharedHistory);
+  useEffect(() => {
+    greetingRef.current = greeting;
+    pageRef.current = page;
+    onTurnRef.current = onTurn;
+    sharedRef.current = sharedHistory;
+  });
 
   const stop = useCallback(() => {
     active.current = false;
@@ -94,15 +122,17 @@ export function useVoiceAgent() {
 
   useEffect(() => stop, [stop]);
 
-  /** Speak a line. If voice fails the words still show, held long enough to read. */
-  const say = useCallback(async (text: string) => {
+  /** Speak a line (or play its saved clip). If voice fails the words still show, held long enough to read. */
+  const say = useCallback(async (text: string, src?: string) => {
     setPhase('thinking');
     try {
-      const res = await fetch('/api/voice/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
+      const res = src
+        ? await fetch(src)
+        : await authedFetch('/api/voice/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }),
+          });
       if (!res.ok || !ctx.current || !active.current) throw new Error('tts');
       const buffer = await ctx.current.decodeAudioData(await res.arrayBuffer());
       if (!active.current || !ctx.current) return;
@@ -207,8 +237,10 @@ export function useVoiceAgent() {
     ctx.current = audio;
     void audio.resume();
 
-    history.current.push({ role: 'agent', text: GREETING });
-    await say(GREETING);
+    const hello = greetingRef.current;
+    history.current.push({ role: 'agent', text: hello.text });
+    onTurnRef.current?.('agent', hello.text);
+    await say(hello.text, hello.src);
 
     let misses = 0;
     while (active.current) {
@@ -228,7 +260,7 @@ export function useVoiceAgent() {
         try {
           const form = new FormData();
           form.append('audio', clip);
-          const res = await fetch('/api/voice/stt', { method: 'POST', body: form });
+          const res = await authedFetch('/api/voice/stt', { method: 'POST', body: form });
           heardText = res.ok ? ((await res.json()) as { text?: string }).text?.trim() ?? '' : '';
         } catch {
           heardText = '';
@@ -243,12 +275,15 @@ export function useVoiceAgent() {
           stop();
           return;
         }
-        await say("Sorry, I didn't catch that. Could you say it again?");
+        const again = "Sorry, I didn't catch that. Could you say it again?";
+        onTurnRef.current?.('agent', again);
+        await say(again);
         continue;
       }
       misses = 0;
 
       if (isGoodbye(heardText)) {
+        onTurnRef.current?.('user', heardText, { end: true });
         setCaption({ who: 'note', text: 'Goodbye! Tap me whenever you want to talk.' });
         stop();
         return;
@@ -256,23 +291,34 @@ export function useVoiceAgent() {
 
       setCaption({ who: 'you', text: heardText });
       history.current.push({ role: 'user', text: heardText });
+      onTurnRef.current?.('user', heardText);
       setPhase('thinking');
 
       let reply = 'Sorry, I could not reach my brain just now. Please try again in a moment.';
+      let end = false;
+      let toolCalls: VoiceToolCall[] = [];
       try {
-        const res = await fetch('/api/agent', {
+        const res = await authedFetch('/api/agent', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: history.current, page: 'Home' }),
+          body: JSON.stringify({ messages: sharedRef.current?.() ?? history.current, page: pageRef.current() }),
         });
-        const data = (await res.json()) as { reply?: string; error?: string };
+        const data = (await res.json()) as { reply?: string; error?: string; end?: boolean; toolCalls?: VoiceToolCall[] };
         reply = data.reply ?? data.error ?? reply;
+        end = data.end === true;
+        toolCalls = data.toolCalls ?? [];
       } catch {
         /* keep the fallback line */
       }
       if (!active.current) return;
       history.current.push({ role: 'agent', text: reply });
+      onTurnRef.current?.('agent', reply, { toolCalls, end });
       await say(reply);
+      // The agent decided the conversation is over: say goodbye, then let go of the mic.
+      if (end) {
+        stop();
+        return;
+      }
     }
   }, [listen, say, stop]);
 

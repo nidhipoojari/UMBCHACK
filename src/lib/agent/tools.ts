@@ -1,6 +1,7 @@
 import 'server-only';
 
 import type { FunctionDeclaration } from './gemini';
+import { END_CONVERSATION, PERSONAL_TOOLS, type ToolContext } from './my-tools';
 
 /**
  * The agent's tools: what it declares to Gemini, and what runs when Gemini
@@ -14,7 +15,7 @@ import type { FunctionDeclaration } from './gemini';
  * UI need no change.
  */
 
-export type ToolResult = Record<string, unknown> & { source: 'placeholder' | 'dataset' };
+export type ToolResult = Record<string, unknown> & { source: 'placeholder' | 'dataset' | 'profile' };
 
 type Tool = {
   declaration: FunctionDeclaration;
@@ -95,9 +96,24 @@ const TOOLS: Tool[] = [
   },
 ];
 
-export const toolDeclarations: FunctionDeclaration[] = TOOLS.map((t) => t.declaration);
+/** Everything Gemini may call: career tools, the user's own records, and ending the conversation. */
+export const toolDeclarations: FunctionDeclaration[] = [
+  ...TOOLS.map((t) => t.declaration),
+  ...PERSONAL_TOOLS.map((t) => t.declaration),
+  END_CONVERSATION,
+];
 
-export async function runTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
+export async function runTool(name: string, args: Record<string, unknown>, ctx: ToolContext): Promise<ToolResult> {
+  const personal = PERSONAL_TOOLS.find((t) => t.declaration.name === name);
+  if (personal) {
+    if (!ctx.userId) return { source: 'profile', error: 'Sign in to see your own records.' };
+    try {
+      return await personal.run(args, ctx.userId);
+    } catch (error) {
+      console.error(`agent tool ${name} failed`, error);
+      return { source: 'profile', error: 'That record could not be read just now.' };
+    }
+  }
   const tool = TOOLS.find((t) => t.declaration.name === name);
   if (!tool) return { source: 'placeholder', error: `Unknown tool ${name}.` };
   return tool.run(args);
