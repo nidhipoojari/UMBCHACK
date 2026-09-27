@@ -1,8 +1,9 @@
 {
   "hosting": {
-    "public": "out",
-    "cleanUrls": true,
-    "trailingSlash": false,
+    "source": ".",
+    "frameworksBackend": {
+      "region": "us-east1"
+    },
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "headers": [
       {
