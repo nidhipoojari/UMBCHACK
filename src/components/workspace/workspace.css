@@ -1225,6 +1225,8 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .agent-console-glow { position: absolute; width: 240px; height: 240px; right: -60px; top: -100px; border-radius: 50%; background: #7967ff; filter: blur(70px); opacity: 0.35; pointer-events: none; }
 .agent-console-copy { position: relative; z-index: 1; }
 .agent-live { display: inline-flex; align-items: center; gap: 0.45rem; color: #b7f8e4; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.agent-live.is-paused { color: #ffd39b; }
+.agent-live.is-paused > span { background: #f39a32; box-shadow: 0 0 0 4px rgb(243 154 50 / 16%); }
 .agent-console h2 { margin: 0.55rem 0 0.35rem; color: #fff; font-size: clamp(1.55rem, 4vw, 2.35rem); letter-spacing: -0.04em; }
 .agent-console-copy p { max-width: 580px; margin: 0; color: rgb(255 255 255 / 68%); line-height: 1.5; }
 .agent-console-copy > small { display: block; margin-top: 0.42rem; color: rgb(255 255 255 / 62%); font-size: 0.68rem; }
@@ -1283,6 +1285,11 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .mission-board-eyebrow { display: inline-flex; align-items: center; gap: 0.36rem; color: #674bd0; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
 .mission-board-eyebrow svg { color: #f19b2d; fill: #ffd15a; }
 .mission-count { flex: none; padding: 0.42rem 0.62rem; border-radius: 999px; color: #513cb2; background: color-mix(in srgb, #7b65ed 11%, var(--paper)); font-size: 0.72rem; font-weight: 750; }
+.mission-head-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
+.mission-refresh { display: inline-flex; align-items: center; gap: 0.38rem; min-height: 34px; padding: 0.48rem 0.65rem; border: 1px solid color-mix(in srgb, #f08a2d 30%, var(--line)); border-radius: 11px; color: #8b4d0b; background: linear-gradient(135deg, color-mix(in srgb, #fff0b6 62%, var(--paper)), color-mix(in srgb, #ffd0a0 35%, var(--paper))); font: 720 0.7rem/1 inherit; cursor: pointer; transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease; }
+.mission-refresh:hover:not(:disabled) { transform: translateY(-2px); filter: saturate(1.12); box-shadow: 0 9px 20px rgb(224 123 36 / 18%); }
+.mission-refresh:active:not(:disabled) { transform: scale(0.96); }
+.mission-refresh:disabled { cursor: default; opacity: 0.55; }
 .mission-lock-note { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.85rem; padding: 0.72rem 0.82rem; border: 1px solid color-mix(in srgb, #f0a134 24%, var(--line)); border-radius: 14px; color: #8d5410; background: color-mix(in srgb, #fff0bb 52%, var(--paper)); font-size: 0.78rem; }
 .mission-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; }
 .company-mission { --mission-accent: #7763e7; --mission-soft: #eeeaff; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 0.85rem; min-width: 0; padding: 1rem; border: 1px solid color-mix(in srgb, var(--mission-accent) 20%, var(--line)); border-radius: 20px; background: color-mix(in srgb, var(--mission-soft) 25%, var(--paper)); box-shadow: 0 10px 28px rgb(47 41 91 / 7%); transition: transform 190ms ease, box-shadow 190ms ease, opacity 190ms ease, filter 190ms ease; }
@@ -1363,6 +1370,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .agent-chat > li { max-width: 92%; }
   .mission-board { margin-inline: -4px; border-radius: 20px; }
   .mission-board-head { align-items: flex-start; }
+  .mission-head-actions { justify-content: flex-start; }
   .mission-grid { grid-template-columns: 1fr; }
   .mission-actions { align-items: stretch; flex-direction: column; }
 }
@@ -1375,6 +1383,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .agent-quest-progress span,
   .company-mission,
   .mission-button,
+  .mission-refresh,
   .agent-proof summary { transition: none; }
   .alumni-list > li.is-celebrating,
   .agent-view-panel,

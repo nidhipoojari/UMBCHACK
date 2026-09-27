@@ -57,7 +57,7 @@ export async function GET(request: Request) {
          JOIN latest_resume l USING (document_id)
         WHERE l.user_id = $1
         ORDER BY m.rank
-        LIMIT 10`,
+        LIMIT 20`,
       [uid],
     ),
     applicationHistory(uid),

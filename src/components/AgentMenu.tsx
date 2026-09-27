@@ -16,6 +16,7 @@ import {
   MessageCircle,
   Network,
   Radio,
+  RefreshCw,
   Send,
   ShieldCheck,
   Sparkles,
@@ -331,7 +332,6 @@ function MissionReceipt({ outcome }: { outcome: ApplyOutcome }) {
 function CompanyMission({
   match,
   index,
-  ready,
   already,
   skipped,
   pending,
@@ -343,7 +343,6 @@ function CompanyMission({
 }: {
   match: Match;
   index: number;
-  ready: boolean;
   already: boolean;
   skipped: boolean;
   pending: boolean;
@@ -383,7 +382,7 @@ function CompanyMission({
         <button
           type="button"
           className="mission-button is-primary"
-          disabled={!ready || pending || sent || skipped}
+          disabled={pending || sent || skipped}
           onClick={onApply}
         >
           {pending ? <><Loader2 size={15} className="spin" aria-hidden="true" /> Encrypting…</> : sent ? <><Check size={15} aria-hidden="true" /> Introduced</> : <><Send size={15} aria-hidden="true" /> Approve &amp; send</>}
@@ -410,6 +409,8 @@ export function AgentMenu() {
   const [outcomes, setOutcomes] = useState<Record<string, ApplyOutcome>>({});
   const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [matchPage, setMatchPage] = useState(0);
+  const [refreshingMatches, setRefreshingMatches] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -446,22 +447,34 @@ export function AgentMenu() {
     };
   }, [load]);
 
-  const missions = useMemo(() => {
+  const allMissions = useMemo(() => {
     const companies = new Set<string>();
     return (applyContext?.matches ?? []).filter((match) => {
       const key = (match.company ?? match.job_id).trim().toLowerCase();
       if (companies.has(key)) return false;
       companies.add(key);
       return true;
-    }).slice(0, 5);
+    });
   }, [applyContext]);
+  const missionPages = Math.max(1, Math.ceil(allMissions.length / 5));
+  const missions = useMemo(
+    () => allMissions.slice((matchPage % missionPages) * 5, (matchPage % missionPages) * 5 + 5),
+    [allMissions, matchPage, missionPages],
+  );
 
-  useEffect(() => {
-    if (!selectedJobId && missions[0]) setSelectedJobId(missions[0].job_id);
-    if (selectedJobId && missions.length && !missions.some((match) => match.job_id === selectedJobId)) {
-      setSelectedJobId(missions[0].job_id);
+  const refreshMatches = useCallback(async () => {
+    setRefreshingMatches(true);
+    try {
+      if (missionPages > 1) {
+        setMatchPage((page) => (page + 1) % missionPages);
+        setSelectedJobId(null);
+      } else {
+        await load();
+      }
+    } finally {
+      window.setTimeout(() => setRefreshingMatches(false), 420);
     }
-  }, [missions, selectedJobId]);
+  }, [load, missionPages]);
 
   const selectedMission = missions.find((match) => match.job_id === selectedJobId) ?? missions[0] ?? null;
   const selectedJtis = useMemo(
@@ -535,7 +548,7 @@ export function AgentMenu() {
       <section className="agent-console" aria-labelledby="secure-line-h">
         <div className="agent-console-glow" aria-hidden="true" />
         <div className="agent-console-copy">
-          <span className="agent-live"><span /> your agent is ready</span>
+          <span className={`agent-live${ready ? '' : ' is-paused'}`}><span /> {ready ? 'your agent is ready' : 'your agent needs one check'}</span>
           <h2 id="secure-line-h">Today&rsquo;s opportunity quest</h2>
           <p>Choose the companies worth your time. Your agent handles the secure introduction and brings the receipt back here.</p>
           <div className="agent-quest-progress"><span style={{ width: `${questPct}%` }} /></div>
@@ -566,7 +579,12 @@ export function AgentMenu() {
             <h2 id="missions-h">Pick your next introduction</h2>
             <p>One strong role from each company. Nothing leaves until you approve it.</p>
           </div>
-          <span className="mission-count">{missions.length}/5 ready</span>
+          <div className="mission-head-actions">
+            <span className="mission-count">{missions.length}/5 ready</span>
+            <button type="button" className="mission-refresh" onClick={() => void refreshMatches()} disabled={refreshingMatches || allMissions.length === 0}>
+              <RefreshCw size={14} className={refreshingMatches ? 'spin' : ''} aria-hidden="true" /> New matches
+            </button>
+          </div>
         </header>
 
         {missionError ? <p className="auth-error" role="alert">{missionError}</p> : null}
@@ -580,6 +598,11 @@ export function AgentMenu() {
             <LockKeyhole size={15} aria-hidden="true" /> Secure signing is reconnecting. Nothing will send without a valid key.
           </p>
         ) : null}
+        {applyContext && !applyContext.employer ? (
+          <p className="mission-lock-note" role="status">
+            <LockKeyhole size={15} aria-hidden="true" /> The employer agent is reconnecting. You can still press send to see the live receipt.
+          </p>
+        ) : null}
 
         {missions.length ? (
           <div className="mission-grid">
@@ -588,7 +611,6 @@ export function AgentMenu() {
                 key={match.job_id}
                 match={match}
                 index={index}
-                ready={ready}
                 already={Boolean(applyContext?.sent.some((attempt) => attempt.jobId === match.job_id && attempt.accepted))}
                 skipped={skipped.has(match.job_id)}
                 pending={pending === match.job_id}
