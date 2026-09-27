@@ -15,6 +15,7 @@ export const WORKSPACE_LINKS: Record<Role, readonly WorkspaceLink[]> = {
     { href: '/applicant', label: 'Overview', key: 'overview' },
     { href: '/applicant/jobs', label: 'Jobs', key: 'jobs' },
     { href: '/applicant/pipeline', label: 'Pipeline', key: 'pipeline' },
+    { href: '/applicant/network', label: 'Network', key: 'network' },
     { href: '/applicant/apply', label: 'Verify & apply', key: 'apply' },
     { href: '/applicant/activity', label: 'Activity', key: 'activity' },
     { href: '/applicant/profile', label: 'Profile', key: 'profile' },
