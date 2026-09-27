@@ -132,8 +132,31 @@ jobs:
       - name: Restore applicant agent signing key
         if: github.event_name != 'pull_request'
         run: |
+          service=ssrproject96b6d773106a4
+          firebase_revision="$(gcloud run services describe "$service" \
+            --project "$FIREBASE_PROJECT" --region us-east1 \
+            --format='value(status.latestReadyRevisionName)')"
+          firebase_tag="$(gcloud run services describe "$service" \
+            --project "$FIREBASE_PROJECT" --region us-east1 --format=json | \
+            jq -r --arg revision "$firebase_revision" \
+              '.status.traffic[] | select(.revisionName == $revision and (.tag // "" | startswith("fh-"))) | .tag')"
+
           gcloud run services update ssrproject96b6d773106a4 \
             --project "$FIREBASE_PROJECT" --region us-east1 \
             --update-secrets=/secrets/a2a/a2a-applicant-agent-key=a2a-applicant-agent-key:latest \
             --update-env-vars=A2A_APPLICANT_KEY_FILE=/secrets/a2a/a2a-applicant-agent-key \
             --quiet
+
+          signed_revision="$(gcloud run services describe "$service" \
+            --project "$FIREBASE_PROJECT" --region us-east1 \
+            --format='value(status.latestReadyRevisionName)')"
+          if [ -z "$firebase_tag" ]; then
+            echo "Could not find the Firebase Hosting revision tag." >&2
+            exit 1
+          fi
+          # Hosting calls the fh-* tagged URL, not Cloud Run's untagged latest
+          # URL. Move that exact tag or the site keeps executing the unsigned
+          # Firebase revision even though the new revision is healthy.
+          gcloud run services update-traffic "$service" \
+            --project "$FIREBASE_PROJECT" --region us-east1 \
+            --update-tags="$firebase_tag=$signed_revision" --quiet
