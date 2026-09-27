@@ -62,7 +62,8 @@ async function createPool(): Promise<Pool> {
     password: process.env.DB_PASSWORD,
     max: 5,
     ssl: {
-      ca: process.env.DB_SSL_CA?.replace(/\n/g, '\n'),
+      // .env files hold the PEM on one line with literal "\n" escapes.
+      ca: process.env.DB_SSL_CA?.replace(/\\n/g, '\n'),
       checkServerIdentity: () => undefined,
     },
   });

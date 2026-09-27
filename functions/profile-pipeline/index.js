@@ -1,11 +1,13 @@
 /**
- * The profile pipeline: one package, deployed as four Cloud Functions (2nd gen),
+ * The profile pipeline: one package, deployed as five Cloud Functions (2nd gen),
  * wired together by events.
  *
  *   resume upload (GCS object finalized)
  *     └─ extract-resume ── publishes resume.parsed ──┬─ enrich-github    ─┐
  *                                                     ├─ enrich-linkedin  ─┼─ each publishes profile.enriched
- *                                                     └─ enrich-portfolio ─┘
+ *                                                     ├─ enrich-portfolio ─┘
+ *                                                     └─ match-jobs ── searches job_snapshots, Gemini rerank,
+ *                                                                      publishes jobs.matched
  *
  * Every step writes to intake_events, which the onboarding loading page polls.
  * See deploy.sh for triggers and settings.
@@ -14,8 +16,10 @@ import * as functions from '@google-cloud/functions-framework';
 
 import { enrichGithub, enrichLinkedin, enrichPortfolio } from './enrich.js';
 import { extractResume } from './extract.js';
+import { matchJobs } from './match.js';
 
 functions.cloudEvent('extractResume', extractResume);
 functions.cloudEvent('enrichGithub', enrichGithub);
 functions.cloudEvent('enrichLinkedin', enrichLinkedin);
 functions.cloudEvent('enrichPortfolio', enrichPortfolio);
+functions.cloudEvent('matchJobs', matchJobs);
