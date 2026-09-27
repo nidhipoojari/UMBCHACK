@@ -447,9 +447,14 @@ export async function connectToAlumnus(
 ): Promise<ConnectResult> {
   const jti = randomUUID();
   const agentName = alumniAgentName(campusId);
+  // base64url, NOT hex. The gateway writes this column as a 43-char base64url
+  // digest and sql/004_a2a.sql constrains it to exactly that; hex is the same
+  // bytes spelled differently, so it passed unnoticed here while making the
+  // migration un-re-runnable the moment one such row existed. One encoding, one
+  // column, one meaning.
   const payloadHash = createHash('sha256')
     .update(JSON.stringify({ from: userId, to: campusId, question }))
-    .digest('hex');
+    .digest('base64url');
 
   /** One audit row, same columns as the gateway's. */
   const audit = (decision: 'accepted' | 'refused', reasons: string[]) =>
