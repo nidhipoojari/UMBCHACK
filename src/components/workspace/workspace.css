@@ -1197,7 +1197,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   color: #fff;
   background: linear-gradient(145deg, #7468ff, #5847d8);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 7px 16px rgb(88 71 216 / 20%);
-  font: 700 0.78rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  font: 700 0.78rem/1 var(--font-sans), Georgia, serif;
   letter-spacing: 0.04em;
 }
 .alumni-list > li:nth-child(3n + 2) .alumni-avatar { background: linear-gradient(145deg, #24c8ba, #078c8b); }

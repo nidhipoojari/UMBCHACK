@@ -53,7 +53,7 @@ Two rules shaped every decision:
 | **Best Entrepreneurial Idea** | A two-sided product for students and employers, where verified identity is the moat |
 | **Most Engaging Demo** | Tap the agent's face and it introduces itself out loud, then watch it refuse an employer that cannot prove who it is |
 | **MLH: Best Use of Gemini API** | Gemini runs the resume extraction, the enrichers, match reranking, document drafting, autofill planning and the agent's tool loop |
-| **MLH: Best Use of ElevenLabs** | agentHire's voice: a saved intro clip on the landing page, plus Scribe (speech-to-text) and Flash (text-to-speech) routes for the voice agent |
+| **MLH: Best Use of ElevenLabs** | agentHire's voice: a saved intro clip on the landing page, and a spoken **gap interview** on the Jobs page that asks about missing skills and hears the answers (Scribe speech-to-text + Flash text-to-speech) |
 
 ---
 
@@ -72,10 +72,11 @@ Two rules shaped every decision:
 | 📋 **Pipeline board** | Seven stages (saved → applied → interviewing → offer → accepted, rejected, withdrawn), stored as events rather than overwritten status. | ✅ |
 | 🔐 **Verified agent-to-agent apply** | The applicant agent seals and signs an application to the employer agent. The employer reads its mailbox with a single-use signed credential. | ✅ |
 | 🕵️ **Agents tab** | The A2A registry and a live audit trail of every envelope: who sent it, whether it verified, and why it was refused if it was. | ✅ |
-| 🎓 **Alumni network** | Alumni matched to the student from the hackUMBC dataset, with agent-to-agent introductions. | ✅ |
+| 🎓 **Alumni network** | Alumni matched to the student from the hackUMBC dataset, shown as mission cards, with agent-to-agent introductions. The Agents tab shows each exchange, with the cryptographic evidence one tap deeper. | ✅ |
 | 🎮 **Game layer** | Daily energy, streaks, XP, levels and achievements for reaching out, all derived from existing rows with nothing extra stored. | ✅ |
 | 🧠 **Career agent (Gemini tool loop)** | `/api/agent`: up to 4 tool rounds, answers only from tool results, always states *n*, replies kept under 50 words so they can be spoken. | 🟡 tools return sample numbers |
-| 🎙️ **Voice routes** | ElevenLabs Scribe v2 (speech-to-text) and Flash v2.5 (text-to-speech) behind sign-in and a per-user rate limit, plus a hands-free listening loop (`useVoiceAgent`). | 🟡 built, not yet wired into the UI |
+| 🎤 **Gap interview** | On the Jobs page, the agent counts the skills your matched roles keep asking for that your resume doesn't show, and asks about the top two or three **out loud** (or in a typed form). Gemini turns each answer into a verdict with your own evidence, then only the roles those answers touch are re-scored, each rising by a capped amount. Answers never become resume lines, so the fact gate can't be fooled by a spoken "yes". | ✅ |
+| 🎙️ **Voice routes** | ElevenLabs Scribe v2 (speech-to-text) and Flash v2.5 (text-to-speech) behind sign-in and a per-user rate limit. Used by the gap interview; the open-ended hands-free loop (`useVoiceAgent`) is not mounted yet. | ✅ |
 | 💬 **Chat drawer** | The right-hand transcript panel on every workspace page. | 🚧 seeded conversation, canned reply |
 | 🧑‍💼 **Employer workspace** | The applicant mailbox is real. The overview, candidate search and activity feed are sample layouts. | 🟡 |
 | 🌌 **Landing page** | A WebGL star field, an 11-beat scroll story, a cost ledger, a fraud gate and a handshake explainer. Respects `prefers-reduced-motion` throughout. | ✅ |
@@ -235,6 +236,7 @@ Run the battery: `node functions/agent-gateway/test/attack-battery.mjs`. The ful
 | **Landing intro** | `public/agenthire-intro.mp3` + `AgentGreeter.tsx` | *"Hi, I'm agentHire, your voice-first job agent. I match you to roles and verify every employer first."* Generated once with ElevenLabs, then served as a static file, so **playing it costs nothing**. If the line changes, the clip must be regenerated. |
 | **Speech → text** | `POST /api/voice/stt` | ElevenLabs `scribe_v2`, with a 2 MB cap. |
 | **Text → speech** | `POST /api/voice/tts` | ElevenLabs `eleven_flash_v2_5` in agentHire's voice, with an 800-char cap. The 40 most recent short lines are cached in memory. |
+| **Scripted voice** | `src/components/useVoiceIO.ts` | Speak one line, hear one answer, with the Firebase token attached. The gap interview uses it; stopping part-way drops into the typed form with what was already heard filled in. |
 | **Hands-free loop** | `src/components/useVoiceAgent.ts` | Listen → detect end of speech from loudness → STT → `/api/agent` → TTS → listen again. Saying "bye" ends the conversation. Not mounted anywhere yet. |
 
 Both voice routes require sign-in and are limited to 60 calls per 10 minutes per user, so a runaway loop cannot drain credits.
@@ -243,7 +245,7 @@ Both voice routes require sign-in and are limited to 60 calls per 10 minutes per
 
 ## 🎨 Design System
 
-Two colours and one typeface. Every other shade is ink at a lower opacity.
+One typeface everywhere. The landing page and the core workspace use two colours, paper and ink, with every other shade as ink at a lower opacity. The Network and Agents screens add an accent palette (violet, teal, coral, green) to tell activities and states apart.
 
 | Token | Purpose |
 |---|---|
@@ -253,7 +255,7 @@ Two colours and one typeface. Every other shade is ink at a lower opacity.
 | `--radius` · `--glow` | Rounded cards, and a soft ink shadow on hover in place of borders |
 | `--gutter` · `--page-inset` · `--nav-h` | Layout rhythm; full-bleed sections realign to the text column |
 
-State is carried by words, icons and the agent's face, not by extra colours.
+Wherever colour carries meaning, the same state also has an icon and a text label, so nothing depends on colour alone.
 
 ---
 
@@ -273,6 +275,7 @@ State is carried by words, icons and the agent's face, not by extra colours.
 │   │   ├── AgentFace*.tsx           The agent's face: SVG, three.js, lazy loader
 │   │   ├── AgentGreeter.tsx         Tap-to-hear intro on the landing page
 │   │   ├── useVoiceAgent.ts         Hands-free voice loop (not mounted yet)
+│   │   ├── useVoiceIO.ts            Scripted voice: speak a line, hear an answer
 │   │   ├── Starfield*.tsx           WebGL star field
 │   │   ├── workspace/               Shell, nav, chat drawer, jobs, pipeline, A2A, alumni
 │   │   └── game/                    Energy, streak, XP, achievements, level-up
@@ -281,6 +284,7 @@ State is carried by words, icons and the agent's face, not by extra colours.
 │       ├── artifacts/               Posting reads, drafting, fact gate, print view
 │       ├── match/ · autofill/       Eligibility, skill extraction, autofill evidence
 │       ├── a2a-*.ts                 Applicant/employer agent keys, apply, mailbox
+│       ├── gaps.ts                  Gap interview: rank gaps, ask, judge answers, rerank
 │       ├── elevenlabs.ts            STT + TTS
 │       ├── verify-token.ts          Firebase ID-token verification
 │       └── db.ts · sql.ts           Postgres pool via the Cloud SQL connector
@@ -363,6 +367,8 @@ Every route requires a Firebase ID token (`Authorization: Bearer <token>`). "App
 | `GET /api/a2a` | signed in | Agent roster and audit counts |
 | `GET·POST /api/a2a/apply` | applicant | List matches, send a sealed application |
 | `GET /api/a2a/mailbox` | employer | Read the employer agent's inbox |
+| `GET·POST /api/gaps` | applicant | GET: the skills the gap interview would cover. POST: start it (up to 3 spoken questions) |
+| `POST /api/gaps/answers` | applicant | Judge the answers, save them on `profile_gaps`, re-score the touched matches (409 if nothing was asked, 429 while a rerank is running) |
 | `POST /api/agent` | signed in | One turn with the Gemini career agent |
 | `POST /api/voice/stt` · `/tts` | signed in, rate-limited | ElevenLabs speech in and out |
 
@@ -398,7 +404,7 @@ pull request  →  same build  →  preview channel pr-<n> (expires in 7 days)
 | `/signin` · `/signup` | Email or Google; `?role=applicant\|employer` | ✅ |
 | `/applicant/intake/resume` → `/progress` | Upload a PDF, watch the profile build | ✅ |
 | `/applicant` | Overview with real matches | 🟡 activity is sample |
-| `/applicant/jobs` · `/jobs/[jobId]` | Matches, and the job page with toolbox, employer check and autofill | ✅ |
+| `/applicant/jobs` · `/jobs/[jobId]` | Matches with the spoken gap interview, and the job page with toolbox, employer check and autofill | ✅ |
 | `/applicant/pipeline` | Seven-stage board | ✅ |
 | `/applicant/network` | Alumni network + game HUD | ✅ |
 | `/applicant/apply` · `/applicant/agents` | Verified apply desk, A2A registry and audit | ✅ |
@@ -434,6 +440,7 @@ Keeping ourselves honest:
 
 | When (EDT) | What changed |
 |---|---|
+| Sun Sep 27, ~02:45 | Gap interview on the Jobs page (spoken or typed, capped re-scoring of affected matches); alumni network and Agents tab revamped as missions with a secure agent line; avatar initials back in Forum |
 | Sun Sep 27, ~02:00 | Voice agent: Gemini tool loop, ElevenLabs STT/TTS routes, tap-to-hear saved intro on the landing page; Forum across every page and form field; this README |
 | Sun Sep 27, ~01:30 | Pipeline board, job page, toolbox with fact gate, autofill worker; employer apply + mailbox via the gateway; game layer (energy, streak, XP, levels) |
 | Sat Sep 26 – Sun Sep 27 | A2A gateway with signing, sealing and the attack battery; alumni network on the hackUMBC dataset; job scanner + matcher |
