@@ -36,6 +36,17 @@ CREATE INDEX IF NOT EXISTS a2a_seen_expiry_idx ON a2a_seen_envelopes (expires_at
 --   A refusal is the interesting record, not the exception: "we declined to
 --   release this candidate's contact details and here is why" is the claim the
 --   product makes, and it is only credible if it is written down.
+--
+--   payload_hash is a SHA-256 of the SEALED body — the ciphertext and the
+--   public parameters that identify it — and never of the opened one. This
+--   table outlives the message it describes and is read by more people than the
+--   message is, so it is the one place where "we kept a copy of the
+--   application" must not be able to become true by accident.
+--
+--   It also records READS of the mailbox, accepted and refused. Those carry no
+--   body, so payload_hash is NULL for them and `reasons` says what the read
+--   was — an accepted row that names its scope, rather than leaving a reader of
+--   this table to infer "this was a read" from a null column.
 CREATE TABLE IF NOT EXISTS a2a_audit (
   audit_id     BIGSERIAL PRIMARY KEY,
   occurred_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -44,9 +55,24 @@ CREATE TABLE IF NOT EXISTS a2a_audit (
   jti          TEXT,
   decision     TEXT NOT NULL,                  -- accepted | refused
   reasons      TEXT[] NOT NULL DEFAULT '{}',
-  payload_hash TEXT,                           -- sha256 of the body; never the body
+  payload_hash TEXT,                           -- sha256 of the sealed body; never any body
   CONSTRAINT a2a_audit_decision_ck CHECK (decision IN ('accepted','refused'))
 );
+
+-- The column's meaning, enforced rather than described. A SHA-256 in base64url
+-- is exactly 43 characters from a 64-character alphabet; a body is not. The
+-- application-side guarantee is that only sealing.hashCiphertext() can produce
+-- this value and it refuses anything that is not already ciphertext — this is
+-- the second lock, for the day someone writes a raw INSERT by hand or an ORM is
+-- pointed at the table. It cannot make a 43-character body impossible, and it
+-- is not meant to; it makes storing a body impossible.
+--
+-- DROP-then-ADD rather than a DO block: it is idempotent without a procedural
+-- block, and re-validating on every migration is the point. If the table has
+-- drifted out of the constraint, the migration should fail rather than skip it.
+ALTER TABLE a2a_audit DROP CONSTRAINT IF EXISTS a2a_audit_hash_ck;
+ALTER TABLE a2a_audit ADD CONSTRAINT a2a_audit_hash_ck
+  CHECK (payload_hash IS NULL OR payload_hash ~ '^[A-Za-z0-9_-]{43}$');
 
 CREATE INDEX IF NOT EXISTS a2a_audit_time_idx ON a2a_audit (occurred_at DESC);
 
@@ -56,6 +82,14 @@ CREATE INDEX IF NOT EXISTS a2a_audit_time_idx ON a2a_audit (occurred_at DESC);
 --   message is an invitation, and `kind` records which rather than forking the
 --   schema. Splitting them would duplicate every column to express a
 --   distinction the sender's role already makes.
+--
+--   `payload` HOLDS THE OPENED BODY. That is deliberate and it is the honest
+--   edge of the confidentiality story: the body is sealed against everyone on
+--   the path between the two agents (see lib/sealing.mjs), and this gateway is
+--   the endpoint that path leads to. An application nobody can read is not an
+--   application. So the plaintext stops here, under the database's own access
+--   controls and the retention the agent card publishes — and nowhere else:
+--   a2a_audit, which is kept longer, holds only the ciphertext digest.
 --
 --   job_id is deliberately NOT a foreign key to job_snapshots. An agent may
 --   legitimately reference a posting we have never scanned — a board we do not
