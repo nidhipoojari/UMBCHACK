@@ -57,5 +57,5 @@ export function destinationFor(role: Role | null, intake: IntakeState = null): s
   if (role !== 'applicant') return '/signup?error=pick-role';
   if (!intake || intake.status === 'failed') return '/applicant/intake/resume';
   if (intake.status !== 'parsed') return `/applicant/intake/progress?doc=${intake.document_id}`;
-  return '/applicant';
+  return '/applicant/jobs';
 }

@@ -26,7 +26,7 @@ import { destinationFor, type Role } from '@/lib/users';
 import { AccountContext } from './account-context';
 import { AccountButton } from './AccountButton';
 import { ChatPanel } from './ChatPanel';
-import { ACCOUNT_HREF, currentLink, WORKSPACE_LABEL, WORKSPACE_LINKS } from './links';
+import { ACCOUNT_HREF, currentLink, WORKSPACE_LABEL, WORKSPACE_LINKS, WORKSPACE_ROOT } from './links';
 import { WorkspaceNav } from './WorkspaceNav';
 
 import './workspace.css';
@@ -88,10 +88,16 @@ function GuardedWorkspace({
             // which is where someone lands right after signing in — so the
             // funnel still works, and a deliberate click on another tab is
             // honoured instead of being overridden.
+            //
+            // "Root" is two paths, not one: /applicant redirects to
+            // /applicant/jobs, so someone signing in arrives at the latter and
+            // a check against `/${role}` alone would never fire — the funnel
+            // would silently stop gating the moment Overview was folded away.
             const destination = destinationFor(result.user.role, result.intake);
             const wrongWorkspace = !destination.startsWith(`/${role}`);
-            const atRoot = startPath.current === `/${role}`;
-            if (wrongWorkspace || (atRoot && destination !== `/${role}`)) {
+            const landing = WORKSPACE_ROOT[role];
+            const atRoot = startPath.current === `/${role}` || startPath.current === landing;
+            if (wrongWorkspace || (atRoot && destination !== landing)) {
               router.replace(destination);
             } else {
               setAccount(result);

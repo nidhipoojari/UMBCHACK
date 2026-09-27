@@ -1,42 +1,19 @@
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
 
-import { OverviewMatches } from '@/components/workspace/MatchList';
-import { Timeline } from '@/components/workspace/PageHead';
-import { FirstName } from '@/components/workspace/ProfileFacts';
-
-export const metadata = { title: 'Overview · agentHire' };
-
-export default function ApplicantOverview() {
-  return (
-    <main id="main" className="ws-main">
-      <header className="ws-head">
-        <p className="eyebrow">Overview</p>
-        <h1>
-          Welcome back<FirstName />.
-        </h1>
-        <p>The roles your agent found for you, and what it has done since you were last here.</p>
-      </header>
-
-      <OverviewMatches
-        aside={
-          <section className="ws-section" aria-labelledby="recent-h">
-            <header>
-              <h2 id="recent-h">Recent activity</h2>
-              <span className="ws-sample">Sample data for now</span>
-            </header>
-            <Timeline
-              items={[
-                { when: 'Today', title: 'Applied to Northwind Labs', detail: 'You approved it; your agent sent it.' },
-                { when: 'Yesterday', title: 'Refused a posting', detail: 'The employer could not be verified.' },
-                { when: 'Mon', title: 'Profile built', detail: 'From your resume and GitHub.' },
-              ]}
-            />
-            <p className="muted">
-              <Link href="/applicant/activity">All activity</Link>
-            </p>
-          </section>
-        }
-      />
-    </main>
-  );
+/**
+ * There is no Overview. `/applicant` is Jobs.
+ *
+ * The screen that used to live here listed the top three of the same
+ * `/api/matches` response the Jobs page lists in full, beside a hardcoded
+ * activity timeline that repeated three of the five invented events already on
+ * /applicant/activity. Everything it owned outright — the greeting and the stat
+ * tiles — is now at the top of Jobs, above the list those tiles are counted
+ * from.
+ *
+ * A redirect rather than a deleted route: the path is in muscle memory, in the
+ * onboarding hand-off and in whatever links were shared while it existed, and
+ * all three should land somewhere rather than 404.
+ */
+export default function ApplicantIndex() {
+  redirect('/applicant/jobs');
 }
