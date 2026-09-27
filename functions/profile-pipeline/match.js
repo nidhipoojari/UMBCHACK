@@ -4,7 +4,7 @@
  * version, saves them, settles its step on the loading page, and fires
  * jobs.matched.
  *
- * Two stages, as in VT Hacks:
+ * Two stages:
  *
  *   1. SEARCH (Postgres, no model calls). Every US posting from the last 30
  *      days in job_snapshots, full-text searched on the applicant's skills and

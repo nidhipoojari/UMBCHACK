@@ -2,7 +2,7 @@
 
 /**
  * AccountButton — who you are signed in as, at the foot of the nav. A link to
- * the account screen, not a menu; sign out lives there (as in VT Hacks).
+ * the account screen, not a menu; sign out lives there.
  */
 import { ChevronRight } from 'lucide-react';
 import Link from 'next/link';

@@ -1,6 +1,5 @@
 /**
- * An ACTION line in the chat: what the agent did, rendered by kind (ported from
- * VT Hacks). The `never` in the switch means adding a kind without a case here
+ * An ACTION line in the chat: what the agent did, rendered by kind. The `never` in the switch means adding a kind without a case here
  * fails the type check.
  */
 import { BadgeCheck, Ban, BriefcaseBusiness, ListChecks, Navigation, UserCheck } from 'lucide-react';

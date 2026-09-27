@@ -1,0 +1,110 @@
+/* Pipeline board: one list of tracked roles, ordered by stage. */
+
+.pipe-muted { color: var(--muted); line-height: 1.6; }
+
+.pipe-select:focus-visible,
+.pipe-card textarea:focus-visible,
+.pipe-card-more > summary:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.pipe-cards {
+  list-style: none;
+  margin: 28px 0 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+.pipe-card { padding: 20px 0; border-bottom: 1px solid var(--line); }
+
+.pipe-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.pipe-card-title { margin: 0; font-size: 18px; line-height: 1.3; }
+.pipe-card-title a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.pipe-card-company { margin: 5px 0 0; font-size: 16px; }
+
+.pipe-stage {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.pipe-stage b { font-weight: 600; }
+
+/* Said in words with a rule beside it; colour is never the only signal. */
+.pipe-card-stalled {
+  margin: 10px 0 0;
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid var(--failure);
+  color: var(--failure);
+  font-size: 15px;
+}
+
+.pipe-card-more { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+.pipe-card-more > summary { cursor: pointer; font-size: 14px; color: var(--muted); }
+.pipe-card-more > * + * { margin-top: 10px; }
+
+.pipe-card-score { font-size: 15px; }
+.pipe-card-reason { display: block; color: var(--muted); font-size: 15px; line-height: 1.55; margin-top: 4px; }
+.pipe-card-age { font-size: 15px; }
+.pipe-card-note { font-size: 15px; font-style: italic; color: var(--muted); }
+.pipe-card-source { font-size: 14px; }
+
+.pipe-field label,
+.pipe-note-label {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.pipe-select {
+  inline-size: 100%;
+  max-inline-size: 320px;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  padding: 9px 0;
+  font: inherit;
+  font-size: 17px;
+}
+.pipe-select:hover,
+.pipe-select:focus { border-color: var(--ink); }
+.pipe-field-hint { font-size: 13px; margin: 6px 0 0; line-height: 1.45; }
+
+.pipe-card textarea {
+  display: block;
+  inline-size: 100%;
+  max-inline-size: 560px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+}
+.pipe-card textarea:hover,
+.pipe-card textarea:focus { border-color: var(--ink); }
+
+/* Always in the DOM so screen readers are already listening; empty takes no space. */
+.pipe-alert:empty { display: none; }
+
+.pipe-empty { max-width: 62ch; }
+.pipe-empty h2 { margin-bottom: 12px; }
+.pipe-empty a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Save to pipeline, on the job page and the job list. */
+.pipeline-save { display: grid; gap: 8px; justify-items: start; }
+.pipeline-save p { margin: 0; font-size: 14px; color: var(--muted); max-width: 52ch; }
+.pipeline-save .spin { animation: pipe-spin 0.9s linear infinite; }
+@keyframes pipe-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pipeline-save .spin { animation: none; } }

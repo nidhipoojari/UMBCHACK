@@ -1,9 +1,9 @@
 -- Resume intake: the uploaded document, what the extractor did with it, and
 -- the structured profile it produced.
 --
--- Ported from VT Hacks (intake_documents, profile_experience, profile_education,
--- profile_skills, profile_projects, profile_certifications, courses,
--- profile_gaps), Delta -> Postgres, with real foreign keys to users.
+-- Tables: intake_documents, profile_experience, profile_education,
+-- profile_skills, profile_projects, profile_certifications, profile_courses and
+-- profile_gaps, with real foreign keys to users.
 --
 -- Flow: the browser uploads the PDF to
 --   gs://agenthire-uploads-349500970232/applicants/<user_id>/resumes/<document_id>.pdf
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS intake_documents (
 CREATE INDEX IF NOT EXISTS intake_documents_user_idx ON intake_documents (user_id, uploaded_at DESC);
 
 -- intake_events — the extractor's running log, one row per step, updated in
--- place as the step settles. Same shape as VT Hacks' streamed log lines.
+-- place as the step settles, so the progress page can stream it.
 CREATE TABLE IF NOT EXISTS intake_events (
   document_id UUID        NOT NULL REFERENCES intake_documents (document_id) ON DELETE CASCADE,
   step_id     TEXT        NOT NULL,              -- stable id per step, e.g. 'read'
@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS profile_certifications (
   created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- profile_courses — VT Hacks' `courses`, keyed like the other child tables.
+-- profile_courses — coursework, keyed like the other child tables.
 CREATE TABLE IF NOT EXISTS profile_courses (
   user_id            TEXT        NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
   course_code        TEXT        NOT NULL,       -- e.g. "CMSC 341"

@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // The Cloud Function is its own Node package, deployed separately.
     "functions/**",
+    // So is the autofill worker (services/ats-worker), a Cloud Run service.
+    "services/**",
   ]),
 ]);
 

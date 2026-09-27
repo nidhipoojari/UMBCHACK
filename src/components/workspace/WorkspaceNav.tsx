@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * WorkspaceNav — the left drawer both workspaces use (ported from VT Hacks).
+ * WorkspaceNav — the left drawer both workspaces use.
  *
  * Push rather than overlay on wide windows: the open state goes on <html> as a
  * data attribute and globals.css turns it into body padding. Collapsed is a

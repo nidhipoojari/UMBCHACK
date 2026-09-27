@@ -5,7 +5,7 @@ import { SignUpForm } from '@/components/SignUpForm';
 import { isGoogleConfigured } from '@/lib/providers';
 import type { Role } from '@/lib/users';
 
-export const metadata = { title: 'Create account · HireWire' };
+export const metadata = { title: 'Create account · agentHire' };
 
 function asRole(value: string | string[] | undefined): Role | undefined {
   if (value === 'applicant' || value === 'employer') return value;
