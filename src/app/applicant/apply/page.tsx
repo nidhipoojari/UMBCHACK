@@ -1,34 +1,27 @@
-import { PageHead, Rows } from '@/components/workspace/PageHead';
+import { ApplyDesk } from '@/components/ApplyDesk';
+import { PageHead } from '@/components/workspace/PageHead';
 
 export const metadata = { title: 'Verify & apply · agentHire' };
 
+/**
+ * `sample={false}` because nothing on this page is illustrative any more. The
+ * roles are this student's own job-matcher results, the fingerprints are the
+ * rows in `a2a_agents` that the gateway checks signatures against, and pressing
+ * the button seals a body to the employer agent's pinned key and posts it to
+ * the agent. What comes back is the gateway's own decision.
+ *
+ * It replaced four hard-coded rows. Those rows described this exact flow and
+ * the flow did not exist: no code in src/ had ever called the gateway.
+ */
 export default function ApplyPage() {
   return (
     <main id="main" className="ws-main">
-      <PageHead eyebrow="Verify & apply" title="Nothing leaves without a check.">
-        Your agent verifies each employer first. Only then does it ask you to approve what gets sent.
+      <PageHead eyebrow="Verify & apply" title="Nothing leaves without a check." sample={false}>
+        Your agent checks the employer&rsquo;s registration, seals the application to the key pinned
+        for it, and signs the result. The employer&rsquo;s agent decides — and if it says no, you
+        get its reasons rather than a shrug.
       </PageHead>
-      <section className="ws-section" aria-labelledby="queue-h">
-        <header>
-          <h2 id="queue-h">Waiting for your approval</h2>
-        </header>
-        <Rows
-          rows={[
-            { title: 'Data Platform Intern · Contoso Analytics', meta: 'Sends: name, email, resume, transcript', pill: 'Employer verified', solid: true },
-            { title: 'ML Engineering Intern · Adatum AI', meta: 'Sends: name, email, resume', pill: 'Employer verified', solid: true },
-          ]}
-        />
-      </section>
-      <section className="ws-section" aria-labelledby="refused-h">
-        <header>
-          <h2 id="refused-h">Refused</h2>
-        </header>
-        <Rows
-          rows={[
-            { title: 'Software Engineer I · Tailspin', meta: 'Domain registered last week, and no public hiring record.', pill: 'Not sent' },
-          ]}
-        />
-      </section>
+      <ApplyDesk />
     </main>
   );
 }
