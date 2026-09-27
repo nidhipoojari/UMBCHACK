@@ -4,9 +4,10 @@
  * The waiting screen, which is really a log viewer (ported from VT Hacks).
  *
  * The upload has already landed in the bucket by the time this renders, and
- * Eventarc has handed it to the extract-resume Cloud Function. The function
- * writes each step it takes to intake_events; this polls them and shows the
- * applicant exactly what is happening to their resume, instead of a spinner.
+ * Eventarc has handed it to the extract-resume Cloud Function, which in turn
+ * fires resume.parsed for the enrichers. Every function writes the steps it
+ * takes to intake_events; this polls them and shows the applicant exactly what
+ * is happening to their resume, instead of a spinner.
  *
  * Deliberately NOT an automatic redirect when it finishes: the log is the most
  * informative thing the product shows about itself, so the Next button is
@@ -33,6 +34,8 @@ const MARK: Record<IntakeEvent['state'], string> = {
 const POLL_MS = 1200;
 /** How long to wait for the function to pick the upload up before saying so. */
 const PICKUP_TIMEOUT_MS = 90_000;
+/** How long to wait for enrichment after the resume itself is saved. */
+const ENRICH_TIMEOUT_MS = 180_000;
 
 function seconds(ms: number): string {
   return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)}s`;
@@ -48,6 +51,7 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const startedAt = Date.now();
+    let parsedAt: number | undefined;
 
     const poll = async () => {
       const user = firebaseAuth.currentUser;
@@ -65,16 +69,24 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
           const body = (await response.json()) as IntakeStatusResponse;
           setEvents(body.events);
           if (body.status === 'parsed') {
-            setOutcome({ kind: 'complete' });
-            return;
+            // The resume is saved, but the enrichers (GitHub, LinkedIn,
+            // portfolio) run after it in parallel. Finish once every step has
+            // settled — or after ENRICH_TIMEOUT_MS, so a stuck enricher never
+            // holds the applicant here; the profile is usable either way.
+            parsedAt ??= Date.now();
+            const settled = body.events.every((event) => event.state !== 'start');
+            if (settled || Date.now() - parsedAt > ENRICH_TIMEOUT_MS) {
+              setOutcome({ kind: 'complete' });
+              return;
+            }
           }
           if (body.status === 'failed') {
             const failed = body.events.find((event) => event.state === 'error');
-            setOutcome({ kind: 'error', message: failed?.detail ?? 'Reading your resume failed.' });
+            setOutcome({ kind: 'error', message: failed?.detail ?? 'We could not build your profile from that file.' });
             return;
           }
           if (body.status === null && Date.now() - startedAt > PICKUP_TIMEOUT_MS) {
-            setOutcome({ kind: 'error', message: 'The resume reader has not picked your upload up yet.' });
+            setOutcome({ kind: 'error', message: 'This is taking much longer than it should.' });
             return;
           }
         }
@@ -111,8 +123,8 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
             {MARK.ok}
           </span>
           <span className="progress-body">
-            <strong>Uploaded to secure storage</strong>
-            <small>Only you and the resume reader can open it.</small>
+            <strong>Uploaded securely</strong>
+            <small>Only you can see it.</small>
           </span>
           <span className="progress-ms" />
         </li>
@@ -139,8 +151,8 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
               {MARK.start}
             </span>
             <span className="progress-body">
-              <strong>Handing it to the resume reader</strong>
-              <small>This can take a few seconds to get going.</small>
+              <strong>Getting started</strong>
+              <small>This can take a few seconds the first time.</small>
             </span>
             <span className="progress-ms" />
           </li>
@@ -158,9 +170,9 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
       {outcome.kind === 'error' ? (
         <div className="progress-error" role="alert">
           <p>
-            <strong>That did not finish.</strong> {outcome.message}
+            <strong>That did not work.</strong> {outcome.message}
           </p>
-          <Link href="/applicant/intake/resume">Upload a resume again</Link>
+          <Link href="/applicant/intake/resume">Try another upload</Link>
         </div>
       ) : null}
     </div>

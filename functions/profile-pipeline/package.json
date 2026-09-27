@@ -1,5 +1,5 @@
 {
-  "name": "extract-resume",
+  "name": "profile-pipeline",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -13,6 +13,7 @@
   "dependencies": {
     "@google-cloud/cloud-sql-connector": "^1.8.0",
     "@google-cloud/functions-framework": "^4.0.0",
+    "@google-cloud/pubsub": "^6.1.0",
     "@google-cloud/storage": "^7.16.0",
     "@google/genai": "^1.20.0",
     "pg": "^8.16.0",

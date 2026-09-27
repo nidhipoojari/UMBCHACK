@@ -21,7 +21,7 @@ export default function ResumeIntakePage() {
       <div className="intake-shell">
         <h1>Start with your resume.</h1>
         <p className="muted">
-          Add it and I start reading straight away — you can watch on the next screen.
+          Add it and I will start building your profile straight away — you can watch on the next screen.
         </p>
 
         <ResumeIntakeForm />

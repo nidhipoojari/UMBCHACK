@@ -100,17 +100,6 @@ export const INSTRUCTIONS = [
   `Return exactly this shape:\n${OUTPUT_SPEC}`,
 ].join('\n');
 
-/** Parses the model's reply, tolerating a ```json fence around the object. */
-export function parseJsonObject(text) {
-  const trimmed = text.trim();
-  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
-  const body = fenced ? fenced[1] : trimmed;
-  const start = body.indexOf('{');
-  const end = body.lastIndexOf('}');
-  if (start === -1 || end <= start) throw new Error('The model reply had no JSON object.');
-  return JSON.parse(body.slice(start, end + 1));
-}
-
 /** What the resume left out, as questions to ask later, basics first. */
 const GAP_CHECKS = [
   { key: 'name', question: 'What name should I use on your applications?', isMissing: (p) => !p.name },

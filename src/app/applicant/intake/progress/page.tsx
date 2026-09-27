@@ -6,10 +6,10 @@ import { IntakeProgress } from '@/components/IntakeProgress';
 import '../intake.css';
 
 export const metadata: Metadata = {
-  title: 'Reading your resume · agentHire',
+  title: 'Building your profile · agentHire',
 };
 
-/** Onboarding step two: watch the Cloud Function read the resume just uploaded. */
+/** Onboarding step two: watch the profile get built from the resume just uploaded. */
 export default async function IntakeProgressPage({
   searchParams,
 }: {
@@ -21,8 +21,10 @@ export default async function IntakeProgressPage({
   return (
     <main>
       <div className="intake-shell">
-        <h1>Reading your resume.</h1>
-        <p className="muted">Here is everything happening to it, as it happens.</p>
+        <h1>Building your profile.</h1>
+        <p className="muted">
+          From your resume, then your GitHub, LinkedIn and website. Here is each step as it happens.
+        </p>
 
         <IntakeProgress documentId={doc} />
       </div>
