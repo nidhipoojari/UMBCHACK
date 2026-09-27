@@ -1082,6 +1082,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
    into a workspace section and lay out the transcript and the typed answers.
    =========================================================================== */
 
+.ws-section.gi { padding-bottom: 32px; }
 .gi__greeter { margin: 4px auto 0; }
 /* Nothing to do on a tap while it is thinking: say so with the cursor, not a dim face. */
 .gi__greeter .greeter__face:disabled { cursor: default; }
@@ -1598,3 +1599,251 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 
 /* A spoken turn in the chat drawer: a small microphone after the speaker's name. */
 .vt-via { display: inline-block; margin-left: 6px; vertical-align: -1px; opacity: 0.7; }
+
+/* A match row carries one more control than a plain row: the save button sits
+   after the fit score. Declared on .ws-match rather than widening .ws-row,
+   because every other row in the workspace still has exactly three columns and
+   giving them a fourth would leave a dead gutter on each one. */
+.ws-match {
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+@media (max-width: 620px) {
+  /* At phone width the fit score and the save control share the line under the
+     title rather than squeezing the title into a sliver. */
+  .ws-match {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .ws-match > strong {
+    grid-column: 2;
+  }
+}
+
+/* The generated transcript sits above the audit feed and is visibly not it:
+   no receipt, no verified badge, and a note saying where the words came from.
+   Same bubble shapes so it reads as a conversation; different chrome so it is
+   never mistaken for delivered mail. */
+.agent-transcript { margin-bottom: 14px; }
+/* SENTENCE CASE, NOT A BANNER. Uppercase plus letter-spacing turned a short
+   label into the widest thing on the panel and made it read as a section
+   banner competing with the conversation under it. It is a caption; it should
+   sit quietly above the thing it captions. */
+.agent-transcript-head {
+  /* Inset to match the chat's own 1rem padding. Flush against the panel edge
+     the icon was half-clipped by the border and the caption hung off a
+     different left edge from the bubbles it describes. */
+  margin: 0;
+  padding: 0.85rem 1rem 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 10%, transparent);
+}
+.agent-transcript h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 1;
+}
+.agent-transcript h3 > svg { flex: none; opacity: 0.55; }
+
+/* Its own line. Trailing the title inline meant the sentence that distinguishes
+   generated turns from delivered ones was the part most likely to be skipped,
+   which is exactly backwards. */
+.agent-transcript-note {
+  margin: 3px 0 0;
+  padding-left: 21px;
+  font-size: 0.79rem;
+  line-height: 1.4;
+  opacity: 0.7;
+}
+.agent-transcript-note strong { font-weight: 600; opacity: 0.95; }
+/* NOT .is-mine. The shared rule paints an outbound bubble white-on-purple, and
+   an earlier version of this override replaced the background without the
+   colour -- white text on a near-white panel, invisible. The applicant's turns
+   keep the gradient they were designed for; only the employer's side is
+   re-tinted so the two speakers stay distinguishable. */
+.agent-transcript .agent-chat > li:not(.is-mine) .agent-bubble {
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+/* A generated turn has no receipt, so its bubble has no status line and can be
+   tighter than an audit bubble. */
+.agent-transcript .agent-bubble { min-width: 0; }
+.agent-transcript .agent-chat { gap: 1.15rem; padding: 0.9rem 1rem 0.85rem; }
+
+/* Each turn lands just after the one above it, so the exchange reads as a
+   conversation arriving rather than a block appearing. Six steps is enough for
+   the four exchanges this renders; beyond that the delay would outlast anyone's
+   patience, so it stops rather than growing. */
+.agent-transcript .agent-chat > li:nth-child(1) { animation-delay: 0ms; }
+.agent-transcript .agent-chat > li:nth-child(2) { animation-delay: 110ms; }
+.agent-transcript .agent-chat > li:nth-child(3) { animation-delay: 220ms; }
+.agent-transcript .agent-chat > li:nth-child(4) { animation-delay: 330ms; }
+.agent-transcript .agent-chat > li:nth-child(5) { animation-delay: 440ms; }
+.agent-transcript .agent-chat > li:nth-child(n + 6) { animation-delay: 550ms; }
+
+/* Motion is the flourish; the conversation is the content. With motion off the
+   turns are simply there, in order, with no delay to sit through. */
+@media (prefers-reduced-motion: reduce) {
+  .agent-transcript .agent-chat > li { animation: none; animation-delay: 0ms !important; }
+}
+
+/* ---- Match cards ----------------------------------------------------------
+   Three complaints, one block: the rows ran together, nothing carried colour,
+   and only the title was clickable.
+
+   CARD, NOT A ROW. Each match is now a bounded surface with its own padding
+   and a hairline, so the eye gets a boundary instead of counting blank lines.
+   The old rule separated rows with a bottom border, which reads as a table —
+   fine for three columns of numbers, wrong for a block of prose plus tags plus
+   two controls. */
+.ws-list:has(.ws-match) { display: grid; gap: 12px; }
+
+.ws-match {
+  position: relative;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+/* THE WHOLE CARD IS THE LINK, via the title's own anchor rather than a second
+   one. A nested <a> wrapping the card would put two links to the same place in
+   the tab order and read the entire card aloud as one link name; stretching
+   the existing anchor keeps exactly one accessible name and one tab stop. */
+.ws-match h3 a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.ws-match:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 20px rgb(15 23 42 / 6%);
+  transform: translateY(-1px);
+}
+.ws-match:focus-within {
+  border-color: var(--line-strong);
+}
+/* Controls sit above the stretched anchor so they remain separately clickable —
+   without this the save button becomes part of the link. */
+.ws-match > strong,
+.ws-match .vb,
+.ws-match .ws-pill,
+.ws-match .pipeline-save {
+  position: relative;
+  z-index: 1;
+}
+
+/* A LEFT EDGE THAT MEANS SOMETHING. The tint is keyed to eligibility, which is
+   the one fact on the card that changes whether it is worth reading at all —
+   colour spent on anything else would be decoration competing with it. */
+.ws-match::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+/* Eligibility, and ONLY eligibility. An earlier version let a skill gap repaint
+   this amber, which meant an eligible role with one missing skill flew the same
+   flag as a role you may not be allowed to hold — and the gap already says its
+   own piece, in its own amber pill, two lines below. One signal, one meaning. */
+.ws-match:has(.ws-pill--solid)::before { background: #1d9a6c; }
+.ws-match:has(.ws-pill:not(.ws-pill--solid))::before { background: #d08a3a; }
+
+/* Skill tags: the ones you have read as earned, the gap reads as a caution.
+   Both were grey before, which made "you have these six" and "you lack this
+   one" the same weight. */
+.ws-match .ws-tags li {
+  background: color-mix(in srgb, #1d9a6c 9%, transparent);
+  border-color: color-mix(in srgb, #1d9a6c 26%, transparent);
+}
+.ws-match__gap {
+  color: #a4632a !important;
+  background: color-mix(in srgb, #d08a3a 9%, transparent);
+  border-radius: 8px;
+  padding: 6px 10px;
+  display: inline-block;
+}
+
+/* The fit score is the number people scan for; it was the same weight as the
+   body copy beside it. */
+.ws-match > strong {
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  .ws-match:hover { box-shadow: 0 6px 20px rgb(0 0 0 / 30%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-match { transition: none; }
+  .ws-match:hover { transform: none; }
+}
+
+/* The fit score: the one tinted surface on the card, banded by the score
+   itself. A continuous ramp would ask the reader to judge a hue against a
+   scale drawn nowhere; three steps say strong / worth a look / a stretch. */
+.ws-match__fit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.1rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+.ws-match__fit.is-strong {
+  background: color-mix(in srgb, #1d9a6c 14%, transparent);
+  color: #10684a;
+}
+.ws-match__fit.is-good {
+  background: color-mix(in srgb, #3b7fd4 13%, transparent);
+  color: #23578f;
+}
+.ws-match__fit.is-fair {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+/* "Check eligibility" is an instruction, so it is a control. Tinted amber to
+   match the left edge it belongs to, and given the affordances of a thing you
+   press rather than a thing you read. */
+.ws-pill--action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  text-decoration: none;
+  color: #8a5420;
+  border-color: color-mix(in srgb, #d08a3a 40%, transparent);
+  background: color-mix(in srgb, #d08a3a 10%, transparent);
+  white-space: nowrap;
+}
+.ws-pill--action:hover,
+.ws-pill--action:focus-visible {
+  background: color-mix(in srgb, #d08a3a 18%, transparent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* THE SAVE BUTTON REPEATED ITS OWN EXPLANATION ON EVERY ROW. One sentence
+   under one button is guidance; the same sentence under twenty is wallpaper,
+   and it was the widest thing on the card. The label already says where the
+   role goes, so the note is kept for screen readers and for the first card
+   only — where it is actually news. */
+.ws-match .pipeline-save__hint { display: none; }
+.ws-match:first-child .pipeline-save__hint {
+  display: block;
+  max-width: 15rem;
+  font-size: 0.74rem;
+  opacity: 0.6;
+}

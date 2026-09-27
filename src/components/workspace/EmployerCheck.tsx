@@ -4,6 +4,7 @@ import { ArrowUpRight, Check, Loader2, PenLine, ShieldAlert } from 'lucide-react
 import { useCallback, useEffect, useState } from 'react';
 
 import { authedFetch } from '@/lib/authed-fetch';
+import { toJobSlug } from '@/lib/job-slug';
 
 type Signal = { name: string; passed: boolean; reason: string };
 type Tier = 'known_employer' | 'unverified';
@@ -41,7 +42,7 @@ export function EmployerCheck({
   const run = useCallback(async () => {
     setCheck({ state: 'checking' });
     try {
-      const response = await authedFetch(`/api/jobs/${encodeURIComponent(jobId)}/employer`);
+      const response = await authedFetch(`/api/jobs/${toJobSlug(jobId)}/employer`);
       const payload = (await response.json()) as {
         error?: string;
         company?: { tier?: Tier; summary?: string; signals?: Signal[] };

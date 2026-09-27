@@ -14,6 +14,7 @@ import { SavePipelineButton } from './SavePipelineButton';
 import { StartInterviewButton, offersInterview } from './StartInterviewButton';
 
 import './job-page.css';
+import { toJobSlug } from '@/lib/job-slug';
 
 function formatDate(value: string | null): string | null {
   if (!value) return null;
@@ -63,7 +64,7 @@ export function JobPage({ jobId }: { jobId: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const response = await authedFetch(`/api/jobs/${encodeURIComponent(jobId)}`);
+        const response = await authedFetch(`/api/jobs/${toJobSlug(jobId)}`);
         const payload = (await response.json()) as JobDetailResponse & { error?: string };
         if (cancelled) return;
         if (!response.ok) setError({ status: response.status, message: payload.error ?? `HTTP ${response.status}` });

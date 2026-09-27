@@ -77,6 +77,24 @@ export async function generateText(
 }
 
 /** Parses a JSON object from model output, tolerating a ```json fence around it. */
+/**
+ * The same job for a JSON ARRAY, and it needs its own function.
+ *
+ * parseJsonObject slices from the first `{` to the last `}`. Handed
+ * `[{"a":1},{"b":2}]` that yields `{"a":1},{"b":2}` — not valid JSON, so it
+ * throws; handed `["a","b"]` there is no brace at all and it throws too. Both
+ * failures were being caught by callers and quietly turned into a fallback,
+ * so two features shipped looking like the model was unavailable when the
+ * model was never asked properly. Callers that want a list must say so.
+ */
+export function parseJsonArray(text: string): unknown {
+  const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  const start = trimmed.indexOf('[');
+  const end = trimmed.lastIndexOf(']');
+  if (start === -1 || end < start) throw new GeminiError('Gemini did not return a JSON array.');
+  return JSON.parse(trimmed.slice(start, end + 1));
+}
+
 export function parseJsonObject(text: string): unknown {
   const trimmed = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   const start = trimmed.indexOf('{');

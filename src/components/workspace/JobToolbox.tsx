@@ -16,6 +16,7 @@ import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 
 import { authedFetch } from '@/lib/authed-fetch';
 
 import './toolbox.css';
+import { toJobSlug } from '@/lib/job-slug';
 
 type Finding = { claim: string; kind: string; severity: 'block' | 'warn'; reason: string };
 
@@ -342,7 +343,7 @@ function JobToolbox({
   const draftOutId = useId();
   const draftOutRef = useRef<HTMLDivElement | null>(null);
 
-  const encodedJobId = encodeURIComponent(jobId);
+  const encodedJobId = toJobSlug(jobId);
 
   /** Scrolls the draft into view; moves focus to it only once it has landed. */
   const reveal = useCallback((ref: RefObject<HTMLDivElement | null>, { move = true }: { move?: boolean } = {}) => {
@@ -644,7 +645,7 @@ export function JobToolboxPanel({
 
   useEffect(() => {
     let cancelled = false;
-    authedFetch(`/api/jobs/${encodeURIComponent(jobId)}/toolbox`)
+    authedFetch(`/api/jobs/${toJobSlug(jobId)}/toolbox`)
       .then(async (response) => {
         const payload = (await response.json()) as ToolboxData & { error?: string };
         if (!response.ok) throw new Error(payload.error ?? `HTTP ${response.status}`);

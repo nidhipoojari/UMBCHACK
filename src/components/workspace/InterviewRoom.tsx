@@ -15,6 +15,7 @@ import {
   type InterviewQuestion,
   type InterviewSessionPayload,
 } from '@/lib/interview-contract';
+import { toJobSlug } from '@/lib/job-slug';
 
 import { PixelWave, useLiveInterviewer } from './LiveInterviewer';
 import './interview.css';
@@ -53,7 +54,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
     // Every answer's critique first, so the readout covers them all.
     await pendingRef.current;
     try {
-      const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/finish`, {
+      const response = await authedFetch(`/api/interview/${toJobSlug(jobId)}/finish`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sessionId: session.sessionId, answers: answersRef.current }),
@@ -86,7 +87,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
       answersRef.current = [...answersRef.current, answer];
       pendingRef.current = pendingRef.current.then(async () => {
         try {
-          const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/turn`, {
+          const response = await authedFetch(`/api/interview/${toJobSlug(jobId)}/turn`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({
@@ -134,7 +135,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
         return;
       }
       try {
-        const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/session`);
+        const response = await authedFetch(`/api/interview/${toJobSlug(jobId)}/session`);
         const payload = (await response.json()) as InterviewSessionPayload & { error?: string };
         if (cancelled) return;
         if (!response.ok) {
@@ -223,7 +224,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
 
   const back = (
     <p className="iv-back">
-      <Link href={`/applicant/jobs/${encodeURIComponent(jobId)}`}>
+      <Link href={`/applicant/jobs/${toJobSlug(jobId)}`}>
         <ArrowLeft size={16} aria-hidden="true" /> Back to the role
       </Link>
     </p>

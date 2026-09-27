@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { authedFetch } from '@/lib/authed-fetch';
 import type { InterviewLiveTicket } from '@/lib/interview-contract';
+import { toJobSlug } from '@/lib/job-slug';
 
 /**
  * A live, two-way voice call with the interviewer: the microphone streams to
@@ -182,7 +183,7 @@ export function useLiveInterviewer(jobId: string, sessionId: string, handlerProp
       setStatus('connecting');
       handlers.current.onNotice('Connecting the interviewer.');
       try {
-        const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/live`, {
+        const response = await authedFetch(`/api/interview/${toJobSlug(jobId)}/live`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ sessionId }),

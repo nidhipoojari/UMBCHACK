@@ -398,6 +398,74 @@ function CompanyMission({
   );
 }
 
+type DialogueTurn = {
+  turnIndex: number;
+  speaker: 'employer' | 'applicant';
+  body: string;
+  origin: 'gemini' | 'fallback';
+  createdAt: string | null;
+};
+
+/**
+ * The generated conversation for the selected role.
+ *
+ * SEPARATE FROM THE AUDIT FEED, DELIBERATELY. The feed below it is delivered
+ * traffic — signed, sealed, replay-checked. These turns are written by a model
+ * from the student's own profile rows and the posting's text. Rendering them
+ * in one list would make a written message indistinguishable from a delivered
+ * one, which is the exact distinction this product exists to make legible, so
+ * they are drawn above it under their own heading and marked.
+ *
+ * GET first, POST only if empty: opening the panel is the common case and must
+ * not spend a model call. Generation happens once per (student, role) and is
+ * stored, so re-opening shows the same conversation rather than a new one.
+ */
+function useDialogue(jobId: string | null): { turns: DialogueTurn[]; writing: boolean } {
+  const [turns, setTurns] = useState<DialogueTurn[]>([]);
+  const [writing, setWriting] = useState(false);
+
+  useEffect(() => {
+    if (!jobId) {
+      setTurns([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      setTurns([]);
+      try {
+        const read = await authedFetch(`/api/agents/dialogue?job_id=${encodeURIComponent(jobId)}`);
+        if (read.ok) {
+          const body = (await read.json()) as { turns?: DialogueTurn[] };
+          if (cancelled) return;
+          if (body.turns?.length) {
+            setTurns(body.turns);
+            return;
+          }
+        }
+        setWriting(true);
+        const made = await authedFetch('/api/agents/dialogue', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ job_id: jobId }),
+        });
+        if (!made.ok || cancelled) return;
+        const body = (await made.json()) as { turns?: DialogueTurn[] };
+        if (!cancelled) setTurns(body.turns ?? []);
+      } catch {
+        // A missing conversation costs the panel its transcript, not its
+        // receipts. The audit feed below is the part that must always render.
+      } finally {
+        if (!cancelled) setWriting(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobId]);
+
+  return { turns, writing };
+}
+
 export function AgentMenu() {
   const [data, setData] = useState<Payload | null>(null);
   const [applyContext, setApplyContext] = useState<ApplyContext | null>(null);
@@ -485,6 +553,8 @@ export function AgentMenu() {
     ),
     [applyContext, selectedMission?.job_id],
   );
+  const { turns, writing } = useDialogue(selectedMission?.job_id ?? null);
+
   const feed = useMemo(() => {
     if (!data || !selectedMission) return [];
     const companyFeed = data.feed.filter((entry) => entry.jti && selectedJtis.has(entry.jti));
@@ -782,6 +852,49 @@ export function AgentMenu() {
             </button>
           ))}
         </div>
+
+        {turns.length > 0 || writing ? (
+          <section className="agent-transcript" aria-labelledby="transcript-h">
+            {/* Two lines, not one. The title and the disclaimer were running
+                together into a single wide uppercase run that read as a banner
+                and pushed the note off to where nobody finishes reading it —
+                and the note is the part that must land, since it is what stops
+                a written turn being mistaken for delivered mail. Title first,
+                in sentence case; the caveat directly under it, quiet but
+                whole. */}
+            <header className="agent-transcript-head">
+              <h3 id="transcript-h">
+                <MessageCircle size={14} aria-hidden="true" />
+                What the agents discussed
+              </h3>
+              <p className="agent-transcript-note">
+                Written from your profile and the posting — <strong>not delivered mail</strong>
+              </p>
+            </header>
+            {writing && turns.length === 0 ? (
+              <p className="muted">
+                <Loader2 size={13} className="spin" aria-hidden="true" /> The agents are talking…
+              </p>
+            ) : (
+              <ol className="agent-chat">
+                {turns.map((turn) => (
+                  <li
+                    key={turn.turnIndex}
+                    className={turn.speaker === 'applicant' ? 'is-mine' : 'is-theirs'}
+                  >
+                    <div className="agent-bubble-who">
+                      {turn.speaker === 'applicant' ? <Bot size={13} aria-hidden="true" /> : <Radio size={13} aria-hidden="true" />}
+                      <strong>{turn.speaker === 'applicant' ? 'Your agent' : `${selectedMission?.company ?? 'Employer'} agent`}</strong>
+                    </div>
+                    <div className="agent-bubble">
+                      <p>{turn.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        ) : null}
 
         {pending === selectedMission?.job_id ? (
           <ol className="agent-chat is-live" aria-live="polite">

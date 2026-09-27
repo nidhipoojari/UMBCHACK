@@ -1,5 +1,17 @@
-/* Pipeline board: one column per stage across the full page. On a narrower
-   screen the columns wrap onto more rows instead of scrolling sideways. */
+/* Pipeline board: one column per stage, always on ONE row.
+
+   It used to wrap onto more rows on a narrow screen, chosen to avoid sideways
+   scrolling. That produced the bug this replaces: a wrapped grid row is as
+   tall as its tallest column, so one card under Interviewing stretched the
+   empty Saved and Applied beside it into a screen of dead space, and the
+   stages stopped reading left-to-right in the order they actually happen.
+   align-items: start fixes the stretch but not the row height, because the
+   row is still sized by its tallest cell.
+
+   A pipeline is a sequence. Saved -> Applied -> Interviewing is the meaning,
+   and a layout that puts Withdrawn on a line under Saved has thrown that away
+   to avoid a scrollbar. So it scrolls sideways, which is what every board of
+   this shape does, and the order survives. */
 
 .ws-main.ws-main-wide { max-width: none; }
 
@@ -14,10 +26,21 @@
 
 .pipe-board {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(232px, 1fr);
   gap: 0 24px;
   margin-top: 28px;
+  /* Columns are independent lists that share a line, not peers in a table, so
+     each hugs its own content instead of stretching to the tallest. */
+  align-items: start;
+  overflow-x: auto;
+  /* Room for the scrollbar so it never sits on top of the last column's text. */
+  padding-bottom: 6px;
+  /* A column at a time, so a flick does not leave a stage half cut off. */
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
 }
+.pipe-col { scroll-snap-align: start; }
 .pipe-col { padding: 22px 0 36px; min-inline-size: 0; border-top: 1px solid var(--line-strong); }
 
 .pipe-col-head h2 { font-size: 19px; letter-spacing: 0.02em; margin: 0; }
@@ -117,12 +140,30 @@
 @keyframes pipe-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pipeline-save .spin { animation: none; } }
 
+/* The stage control on the card face. Inside the disclosure it was styled as a
+   bare underline, which reads as a control once you have already chosen to
+   open a form. On the face it has to look pressable at a glance among seven
+   columns of prose, so it gets a box. It borrows the note textarea's border
+   and 10px radius rather than .ws-button's pill: --control-radius is 999px,
+   which on a select puts the native dropdown arrow inside a curve. No new
+   colour — the palette is unchanged. */
+.pipe-card-stage { margin-top: 12px; }
+.pipe-card-stage .pipe-select {
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 16px;
+}
+.pipe-card-stage .pipe-field-hint { font-size: 12.5px; letter-spacing: 0.01em; }
+
 .pipe-card-rehearse { margin-top: 12px; }
 .pipe-rehearse-button { font-size: 14px; padding: 7px 14px; }
 
 /* Wide screens: all seven stages side by side. */
 @media (min-width: 1200px) {
-  .pipe-board { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line-strong); }
+  /* Wide enough for all seven without scrolling: let them share the width
+     evenly and drop the horizontal gutter for the divider rules below. */
+  .pipe-board { grid-auto-columns: minmax(0, 1fr); gap: 0; overflow-x: visible; border-top: 1px solid var(--line-strong); }
   .pipe-col { border-top: 0; padding-inline: 14px; }
   .pipe-col:first-child { padding-inline-start: 0; }
   .pipe-col:last-child { padding-inline-end: 0; }
