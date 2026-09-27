@@ -30,8 +30,16 @@ import { GeminiError, generateText, parseJsonArray } from '@/lib/gemini';
 
 export const DIALOGUE_MODEL = process.env.GEMINI_DIALOGUE_MODEL ?? 'gemini-flash-latest';
 
-/** Four exchanges. Enough to read as a conversation, short enough to scan. */
-const TURN_PAIRS = 4;
+/**
+ * Five exchanges — ten messages.
+ *
+ * Four was enough to prove the thing works and too few to be worth reading:
+ * one opening, two on substance, one close. Five gives the employer room to
+ * follow up on an answer rather than moving straight to the next topic, which
+ * is where a screening conversation earns its keep. Past this it stops being
+ * a screen and starts being a transcript nobody scrolls.
+ */
+const TURN_PAIRS = 5;
 const MAX_BODY = 420;
 
 export type DialogueTurn = {
@@ -135,6 +143,7 @@ RULES
 - Exactly ${TURN_PAIRS} exchanges: employer asks, applicant answers, ${TURN_PAIRS} times.
 - THE EMPLOYER IS INTERROGATING FIT, not collecting a CV. Do not ask "what is their background", "what skills do they have" or "what is their education" — all of that is already on the profile above, and asking for it wastes the exchange. Ask why this person suits THIS posting: which requirement they meet and on what evidence, how their experience transfers, what the posting demands that they may not have, which of two listed skills is the deeper one.
 - Every employer question must be answerable only by looking at the specific posting and this specific profile. If the question would make equal sense for any other candidate or any other role, it is the wrong question.
+- AT LEAST ONE question must follow up on the answer immediately before it — press on something the applicant's agent just claimed, or ask what it left out. An exchange where every question ignores the previous answer is a form, not a conversation.
 - The applicant's answers must come ONLY from the facts above. Do not invent an employer, a project, a number, a year or a skill that is not listed.
 - The applicant's agent ARGUES the fit from those facts — it connects a listed skill or role to a demand in the posting rather than restating the list.
 - If the posting asks for something the candidate's facts do not cover, the applicant's agent must say so plainly — "that is not on their profile" — and offer the nearest thing that IS listed. A candid gap is the useful answer; a fabricated match is worthless to both sides.
