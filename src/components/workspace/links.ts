@@ -6,9 +6,11 @@ import type { WorkspaceLink } from './WorkspaceNav';
  * Each workspace's destinations, ordered as the work happens (as in VT Hacks).
  *
  * Applicant: find a role, track it, send it, then read back what the agent did.
- * Profile sits last because it is not a step in the work; it is what the work is
- * done from. Employer: see what came in, go looking for people who have not
- * applied yet, then the audit trail.
+ * Agents sits between sending and the activity log because that is where the
+ * question it answers gets asked — "who did that just go to, and why did the
+ * other side refuse?" Profile sits last because it is not a step in the work;
+ * it is what the work is done from. Employer: see what came in, go looking for
+ * people who have not applied yet, then the audit trail.
  */
 export const WORKSPACE_LINKS: Record<Role, readonly WorkspaceLink[]> = {
   applicant: [
@@ -17,6 +19,7 @@ export const WORKSPACE_LINKS: Record<Role, readonly WorkspaceLink[]> = {
     { href: '/applicant/pipeline', label: 'Pipeline', key: 'pipeline' },
     { href: '/applicant/network', label: 'Network', key: 'network' },
     { href: '/applicant/apply', label: 'Verify & apply', key: 'apply' },
+    { href: '/applicant/agents', label: 'Agents', key: 'agents' },
     { href: '/applicant/activity', label: 'Activity', key: 'activity' },
     { href: '/applicant/profile', label: 'Profile', key: 'profile' },
   ],
