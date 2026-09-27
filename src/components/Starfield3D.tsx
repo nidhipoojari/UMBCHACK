@@ -242,6 +242,9 @@ function ShootingStars({ color }: { color: THREE.Color }) {
             vertexShader: TRAIL_VERT,
             fragmentShader: TRAIL_FRAG,
             transparent: true,
+            // The quad is built in screen space with y flipped, which reverses
+            // its winding; without this three culls it as a back face.
+            side: THREE.DoubleSide,
             depthTest: false,
             depthWrite: false,
             uniforms: {
@@ -290,7 +293,7 @@ function ShootingStars({ color }: { color: THREE.Color }) {
         free.age = 0;
         free.life = 0.7 + Math.random() * 0.6;
       }
-      nextAt.current = t + 0.3;
+      nextAt.current = t + 3.5 + Math.random() * 5.5;
     }
 
     shots.current.forEach((s, i) => {
