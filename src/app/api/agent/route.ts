@@ -24,12 +24,13 @@ function asHistory(value: unknown): ChatTurn[] | null {
  * project's Gemini quota.
  *
  * Body: { messages: [{ role: 'user' | 'agent', text }], page?: string }
- * Reply: { reply, toolCalls: [{ name, args, result }] }
+ * Reply: { reply, toolCalls: [{ name, args, result }], end? }   end = the agent closed the conversation
  */
 export async function POST(request: Request) {
   const token = request.headers.get('authorization')?.replace(/^Bearer /, '');
+  let userId: string;
   try {
-    await verifyIdToken(token ?? '');
+    userId = (await verifyIdToken(token ?? '')).uid;
   } catch {
     return Response.json({ error: 'Not signed in.' }, { status: 401 });
   }
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   const page = typeof body.page === 'string' ? body.page.slice(0, 60) : null;
 
   try {
-    return Response.json(await runAgent(history, page));
+    return Response.json(await runAgent(history, page, { userId }));
   } catch (error) {
     console.error('agent turn failed', error);
     const busy = error instanceof GeminiError && error.status === 429;

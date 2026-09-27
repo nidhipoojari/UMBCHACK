@@ -2,8 +2,9 @@
 
 /**
  * The frame around every workspace page: side nav on the left, chat drawer on
- * the right, the page in between. Mounted from the role's layout, so the chat
- * and the nav survive navigation between tabs.
+ * the right, the page in between, and (for applicants) the floating voice agent
+ * over it all. Mounted from the role's layout, so the chat, the agent and the
+ * nav survive navigation between tabs.
  *
  * It is also the guard. Firebase keeps the session in the browser, so who is
  * signed in is only known here: signed out goes to /signin, and anyone who does
@@ -26,6 +27,8 @@ import { destinationFor, type Role } from '@/lib/users';
 import { AccountContext } from './account-context';
 import { AccountButton } from './AccountButton';
 import { ChatPanel } from './ChatPanel';
+import { ConversationProvider } from './conversation';
+import { FloatingAgent } from './FloatingAgent';
 import { ACCOUNT_HREF, currentLink, WORKSPACE_LABEL, WORKSPACE_LINKS, WORKSPACE_ROOT } from './links';
 import { WorkspaceNav } from './WorkspaceNav';
 
@@ -132,7 +135,16 @@ function GuardedWorkspace({
           <p className="muted">Loading your workspace…</p>
         </main>
       )}
-      <ChatPanel role={role} pageName={pageName} />
+      {role === 'applicant' && account ? (
+        // One conversation shared by the chat drawer (typed) and the floating
+        // face (spoken). The agent's tools read the applicant's own records.
+        <ConversationProvider userId={account.user.user_id} pageName={pageName}>
+          <ChatPanel role={role} pageName={pageName} />
+          <FloatingAgent pageName={pageName} />
+        </ConversationProvider>
+      ) : (
+        <ChatPanel role={role} pageName={pageName} />
+      )}
     </AccountContext.Provider>
   );
 }

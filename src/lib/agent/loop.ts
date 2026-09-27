@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { type Content, generate } from './gemini';
+import type { ToolContext } from './my-tools';
 import { runTool, toolDeclarations, type ToolResult } from './tools';
 
 /**
@@ -16,7 +17,8 @@ export type ChatTurn = { role: 'user' | 'agent'; text: string };
 
 export type ToolCall = { name: string; args: Record<string, unknown>; result: ToolResult };
 
-export type AgentReply = { reply: string; toolCalls: ToolCall[] };
+/** `end` is true when the agent decided the conversation is over (end_conversation). */
+export type AgentReply = { reply: string; toolCalls: ToolCall[]; end?: boolean };
 
 function systemPrompt(pageName: string | null): string {
   return [
@@ -25,6 +27,8 @@ function systemPrompt(pageName: string | null): string {
     'Whenever you state a figure from a tool, also state the cohort size n it came from. If n is under 20, say the estimate is low-confidence.',
     'The career data is synthetic. Never present it as real UMBC outcomes.',
     'Never submit an application or release personal information without the user explicitly saying yes.',
+    "For questions about the user's OWN profile, job matches, pipeline or coursework, call my_profile, my_job_matches, my_pipeline or my_coursework and answer from the result. Never guess their details. Their coursework is a synthetic stand-in from the hackUMBC dataset; say so if you mention it.",
+    'When the user says goodbye or that they are done, call end_conversation with a short farewell instead of replying.',
     'Your replies are read aloud, so keep every reply under 50 words: at most three short sentences, plain speech, no markdown or lists. Mention only the one or two most useful figures, then offer to go deeper.',
     pageName ? `The user is currently on the "${pageName}" page.` : '',
   ]
@@ -32,7 +36,7 @@ function systemPrompt(pageName: string | null): string {
     .join('\n');
 }
 
-export async function runAgent(history: ChatTurn[], pageName: string | null): Promise<AgentReply> {
+export async function runAgent(history: ChatTurn[], pageName: string | null, ctx: ToolContext = { userId: null }): Promise<AgentReply> {
   const contents: Content[] = history.map((turn) => ({
     role: turn.role === 'user' ? 'user' : 'model',
     parts: [{ text: turn.text }],
@@ -46,6 +50,13 @@ export async function runAgent(history: ChatTurn[], pageName: string | null): Pr
     contents.push(content);
 
     const calls = content.parts.flatMap((p) => ('functionCall' in p ? [p.functionCall] : []));
+
+    // Ending the conversation short-circuits the loop: no more rounds, no reply to write.
+    const end = calls.find((call) => call.name === 'end_conversation');
+    if (end) {
+      const farewell = typeof end.args?.farewell === 'string' && end.args.farewell.trim() ? end.args.farewell.trim() : 'Goodbye! Click me any time.';
+      return { reply: farewell.slice(0, 160), toolCalls, end: true };
+    }
     if (!calls.length) {
       const reply = content.parts
         .flatMap((p) => ('text' in p ? [p.text] : []))
@@ -57,7 +68,7 @@ export async function runAgent(history: ChatTurn[], pageName: string | null): Pr
     const responses = await Promise.all(
       calls.map(async (call) => {
         const args = call.args ?? {};
-        const result = await runTool(call.name, args);
+        const result = await runTool(call.name, args, ctx);
         toolCalls.push({ name: call.name, args, result });
         return { functionResponse: { name: call.name, response: result } };
       }),
