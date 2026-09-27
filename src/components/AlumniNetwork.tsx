@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { BriefcaseBusiness, Check, Loader2, LockKeyhole, Radio, Send, Shield, Sparkles, Zap } from 'lucide-react';
+import { BriefcaseBusiness, Check, Loader2, LockKeyhole, MessageCircleQuestion, Radio, Send, Shield, Sparkles, Zap } from 'lucide-react';
 
 import { GameHud } from '@/components/game/GameHud';
 import { useGame } from '@/components/game/useGame';
 import type { ConnectOutcome } from '@/lib/game-contract';
 import { firebaseAuth } from '@/lib/firebase';
+import { ALUMNI_QUESTIONS, DEFAULT_ALUMNI_QUESTION } from '@/lib/alumni-questions';
 
 /**
  * The alumni network screen.
@@ -102,6 +103,9 @@ export function AlumniNetwork() {
   const [busy, setBusy] = useState<string | null>(null);
   const [celebrating, setCelebrating] = useState<string | null>(null);
   const [replies, setReplies] = useState<Record<string, string>>({});
+  const [questions, setQuestions] = useState<Record<string, string>>({});
+  const [asked, setAsked] = useState<Record<string, string>>({});
+  const [phases, setPhases] = useState<Record<string, 'preparing' | 'sealing' | 'waiting'>>({});
   const [error, setError] = useState<string | null>(null);
 
   // The game layer is its own feed rather than another field on `data`,
@@ -141,12 +145,22 @@ export function AlumniNetwork() {
   }, [load]);
 
   async function connect(agent: Agent) {
+    const question = (questions[agent.campusId] ?? DEFAULT_ALUMNI_QUESTION).trim();
     setBusy(agent.campusId);
+    setPhases((current) => ({ ...current, [agent.campusId]: 'preparing' }));
     setError(null);
+    const sealing = window.setTimeout(
+      () => setPhases((current) => ({ ...current, [agent.campusId]: 'sealing' })),
+      260,
+    );
+    const waiting = window.setTimeout(
+      () => setPhases((current) => ({ ...current, [agent.campusId]: 'waiting' })),
+      720,
+    );
     try {
       const response = await authedFetch('/api/alumni/connect', {
         method: 'POST',
-        body: JSON.stringify({ campusId: agent.campusId, question: null }),
+        body: JSON.stringify({ campusId: agent.campusId, question }),
       });
       // The route is being taught to return a ConnectOutcome in another
       // worktree. Until it does it answers with the older shape, so the
@@ -166,6 +180,7 @@ export function AlumniNetwork() {
 
       feed.applyOutcome((result as unknown as ConnectOutcome) ?? null, result.alreadyConnected);
       setReplies((prev) => ({ ...prev, [agent.campusId]: result.reply }));
+      setAsked((prev) => ({ ...prev, [agent.campusId]: question }));
       if (!result.alreadyConnected) {
         setCelebrating(agent.campusId);
         window.setTimeout(() => setCelebrating(null), 1400);
@@ -182,6 +197,13 @@ export function AlumniNetwork() {
           : prev,
       );
     } finally {
+      window.clearTimeout(sealing);
+      window.clearTimeout(waiting);
+      setPhases((current) => {
+        const next = { ...current };
+        delete next[agent.campusId];
+        return next;
+      });
       setBusy(null);
     }
   }
@@ -311,6 +333,8 @@ export function AlumniNetwork() {
         <ul className="alumni-list">
           {agents.map((agent) => {
             const justConnected = celebrating === agent.campusId;
+            const activeQuestion = questions[agent.campusId] ?? DEFAULT_ALUMNI_QUESTION;
+            const phase = phases[agent.campusId];
             const degree = [agent.degreeLevel, agent.track, agent.gradYear && `’${agent.gradYear.slice(-2)}`]
               .filter(Boolean)
               .join(' · ');
@@ -358,11 +382,48 @@ export function AlumniNetwork() {
                   {agent.remote ? <span>remote</span> : null}
                 </div>
 
-                {agent.connected ? (
+                {!agent.connected ? (
+                  <fieldset className="alumni-question-set">
+                    <legend><MessageCircleQuestion size={13} aria-hidden="true" /> Ask one useful thing</legend>
+                    <div className="alumni-question-chips">
+                      {ALUMNI_QUESTIONS.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          aria-pressed={activeQuestion === item.prompt}
+                          onClick={() => setQuestions((current) => ({ ...current, [agent.campusId]: item.prompt }))}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                    <label>
+                      <span>Or edit the question</span>
+                      <input
+                        value={activeQuestion}
+                        maxLength={500}
+                        onChange={(event) => setQuestions((current) => ({ ...current, [agent.campusId]: event.target.value }))}
+                      />
+                    </label>
+                  </fieldset>
+                ) : null}
+
+                {agent.connected || phase ? (
                   <div className="alumni-mini-chat" aria-live="polite">
                     <div className="alumni-bubble is-sent">
-                      <LockKeyhole size={12} aria-hidden="true" /> Introduction sealed and delivered
+                      <LockKeyhole size={12} aria-hidden="true" />
+                      {asked[agent.campusId] ?? activeQuestion}
                     </div>
+                    {phase ? (
+                      <div className="alumni-bubble is-progress">
+                        <Loader2 size={12} className="spin" aria-hidden="true" />
+                        {phase === 'preparing'
+                          ? 'Applicant agent is preparing the introduction…'
+                          : phase === 'sealing'
+                            ? 'Encrypting and signing the question…'
+                            : 'Waiting for the alumni agent…'}
+                      </div>
+                    ) : null}
                     {replies[agent.campusId] ? (
                       <div className="alumni-bubble is-received">{replies[agent.campusId]}</div>
                     ) : null}
@@ -374,7 +435,7 @@ export function AlumniNetwork() {
                   <button
                     type="button"
                     className="alumni-connect"
-                    disabled={agent.connected || busy === agent.campusId || outOfEnergy}
+                    disabled={agent.connected || busy === agent.campusId || outOfEnergy || activeQuestion.trim() === ''}
                     onClick={() => connect(agent)}
                   >
                     {agent.connected ? (
