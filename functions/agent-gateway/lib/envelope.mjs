@@ -9,6 +9,25 @@
  *   was it for us   — `aud` must equal our own agent name
  *   is it fresh     — `iat`/`exp`, and `jti` seen at most once
  *
+ * WHAT THIS FILE DOES AND DOES NOT GIVE YOU. Everything here is about
+ * AUTHENTICITY: who wrote the envelope, and that its bytes have not changed
+ * since. None of it is confidentiality — the claims segment is base64url, not
+ * ciphertext, and anyone who can read the channel can read it. Confidentiality
+ * is sealing.mjs, and `sealAndSign` below is the composition the gateway
+ * actually requires: the body is sealed first, and the signature is then taken
+ * over the sealed body.
+ *
+ * WHY THE SIGNATURE GOES OUTSIDE THE ENCRYPTION AND NOT THE OTHER WAY ROUND.
+ * Signing the ciphertext lets a receiver reject an unauthenticated envelope
+ * before spending a private-key operation on it, which keeps decryption off the
+ * path an anonymous attacker can reach. It also means the sealed blob's public
+ * fields — the ephemeral key, the salt, the nonce — are covered by the
+ * signature, so they cannot be swapped by anyone on the wire. The cost is that
+ * the signature proves who *sent* the envelope rather than who *wrote* the
+ * plaintext; the AAD binding in sealing.mjs ties the two together by covering
+ * iss, aud and jti, so a ciphertext cannot be re-signed by a different agent
+ * and still open.
+ *
  * Deliberately no dependency: node's crypto does ES256 over P-256 directly, and
  * a JWS library would be a larger trusted base than the forty lines below.
  *
@@ -20,6 +39,7 @@
  * misuse.
  */
 import { createSign, createVerify, createHash, randomUUID } from 'node:crypto';
+import { seal } from './sealing.mjs';
 
 export const ALG = 'ES256';
 export const TYP = 'agenthire-a2a+jws';
@@ -36,12 +56,19 @@ export function fingerprint(publicKeyPem) {
   return b64u(der);
 }
 
-export function sign({ payload, issuer, audience, privateKeyPem, ttlSeconds = MAX_AGE_SECONDS }) {
+/**
+ * The JWS layer on its own. `payload` is signed as given and NOT encrypted —
+ * callers that handle anything a third party should not read want sealAndSign()
+ * below. `jti` is a parameter only so that sealAndSign can bind the same value
+ * into the ciphertext's AAD before the claims are built; nothing else should
+ * supply it, because a jti chosen twice is a replay of your own message.
+ */
+export function sign({ payload, issuer, audience, privateKeyPem, ttlSeconds = MAX_AGE_SECONDS, jti = randomUUID() }) {
   const now = Math.floor(Date.now() / 1000);
   const claims = {
     iss: issuer,
     aud: audience,
-    jti: randomUUID(),
+    jti,
     iat: now,
     exp: now + ttlSeconds,
     payload,
@@ -126,5 +153,40 @@ export function verify(jws, { publicKeyPem, expectedIssuer, expectedAudience, ma
   return reasons.length > 0 ? { ok: false, reasons } : { ok: true, claims };
 }
 
-export const hashPayload = payload =>
-  createHash('sha256').update(JSON.stringify(payload ?? null)).digest('base64url');
+/**
+ * The form the gateway actually accepts: body sealed to the recipient, then the
+ * whole thing signed.
+ *
+ * The jti is minted here rather than inside sign() because it has to exist
+ * before the seal does — it is part of the AAD, which is what stops a
+ * ciphertext being lifted into a second envelope with a fresh jti to get past
+ * the replay table.
+ *
+ * `recipientPublicKeyPem` is the recipient's pinned P-256 key, and where it came
+ * from decides whether any of this means anything: a sender that takes it from
+ * whoever answered the connection has sealed to whoever answered the
+ * connection. It must come from the sender's own a2a_agents row for that agent.
+ * The recipient's agent card serves the same key over HTTPS, but the card is
+ * not itself signed, so it is good for discovering a rotation and not for
+ * deciding to trust one — compare its fingerprint against the pinned row.
+ */
+export function sealAndSign({
+  plaintext, issuer, audience, privateKeyPem, recipientPublicKeyPem, ttlSeconds = MAX_AGE_SECONDS,
+}) {
+  const jti = randomUUID();
+  const sealed = seal({
+    plaintext,
+    recipientPublicKeyPem,
+    context: { iss: issuer, aud: audience, jti },
+  });
+  return sign({ payload: sealed, issuer, audience, privateKeyPem, ttlSeconds, jti });
+}
+
+/**
+ * hashPayload() USED TO LIVE HERE and was what wrote a2a_audit.payload_hash.
+ * It is gone deliberately: it would hash whatever it was handed, so with a
+ * plaintext body in scope it was one refactor away from putting a digest of a
+ * candidate's email into a table that outlives the message. The audit hash now
+ * comes from sealing.hashCiphertext(), which refuses anything that is not
+ * already ciphertext.
+ */
