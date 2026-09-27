@@ -1218,6 +1218,9 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .agent-live { display: inline-flex; align-items: center; gap: 0.45rem; color: #b7f8e4; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
 .agent-console h2 { margin: 0.55rem 0 0.35rem; color: #fff; font-size: clamp(1.55rem, 4vw, 2.35rem); letter-spacing: -0.04em; }
 .agent-console-copy p { max-width: 580px; margin: 0; color: rgb(255 255 255 / 68%); line-height: 1.5; }
+.agent-console-copy > small { display: block; margin-top: 0.42rem; color: rgb(255 255 255 / 62%); font-size: 0.68rem; }
+.agent-quest-progress { width: min(420px, 100%); height: 8px; margin-top: 1rem; overflow: hidden; border-radius: 999px; background: rgb(255 255 255 / 10%); }
+.agent-quest-progress span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #48dc9e, #f9dd65, #ff8e75); box-shadow: 0 0 20px rgb(72 220 158 / 58%); transition: width 500ms cubic-bezier(0.22, 1, 0.36, 1); }
 .agent-console-score { position: relative; z-index: 1; align-self: center; display: grid; grid-template-columns: auto auto; align-items: center; gap: 0.1rem 0.5rem; min-width: 130px; padding: 0.9rem 1rem; border: 1px solid rgb(255 255 255 / 12%); border-radius: 18px; background: rgb(255 255 255 / 8%); backdrop-filter: blur(12px); }
 .agent-console-score svg { color: #ffd37c; }
 .agent-console-score strong { font-size: 1.65rem; }
@@ -1262,10 +1265,74 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .agent-view-panel .a2a-defences li.is-fired { border-color: color-mix(in srgb, #6f5ce4 28%, var(--line)); background: linear-gradient(145deg, color-mix(in srgb, #7867ee 6%, var(--card)), var(--card)); }
 .agent-view-panel .a2a-agent { border-radius: 16px; }
 
+.mission-board { margin-bottom: 1.25rem; padding: clamp(1rem, 2.5vw, 1.45rem); border: 1px solid color-mix(in srgb, #7765ed 18%, var(--line)); border-radius: 24px; background: linear-gradient(155deg, color-mix(in srgb, #fff9d8 36%, var(--paper)), color-mix(in srgb, #f0edff 52%, var(--paper)) 46%, color-mix(in srgb, #e7fff7 42%, var(--paper))); box-shadow: 0 18px 48px rgb(62 48 142 / 8%); }
+.mission-board-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.mission-board-head h2 { margin: 0.25rem 0; font-size: clamp(1.2rem, 3vw, 1.65rem); letter-spacing: -0.025em; }
+.mission-board-head p { margin: 0; color: var(--muted); font-size: 0.84rem; }
+.mission-board-eyebrow { display: inline-flex; align-items: center; gap: 0.36rem; color: #674bd0; font-size: 0.68rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+.mission-board-eyebrow svg { color: #f19b2d; fill: #ffd15a; }
+.mission-count { flex: none; padding: 0.42rem 0.62rem; border-radius: 999px; color: #513cb2; background: color-mix(in srgb, #7b65ed 11%, var(--paper)); font-size: 0.72rem; font-weight: 750; }
+.mission-lock-note { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.85rem; padding: 0.72rem 0.82rem; border: 1px solid color-mix(in srgb, #f0a134 24%, var(--line)); border-radius: 14px; color: #8d5410; background: color-mix(in srgb, #fff0bb 52%, var(--paper)); font-size: 0.78rem; }
+.mission-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; }
+.company-mission { --mission-accent: #7763e7; --mission-soft: #eeeaff; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 0.85rem; min-width: 0; padding: 1rem; border: 1px solid color-mix(in srgb, var(--mission-accent) 20%, var(--line)); border-radius: 20px; background: color-mix(in srgb, var(--mission-soft) 25%, var(--paper)); box-shadow: 0 10px 28px rgb(47 41 91 / 7%); transition: transform 190ms ease, box-shadow 190ms ease, opacity 190ms ease, filter 190ms ease; }
+.company-mission:hover { transform: translateY(-3px); box-shadow: 0 18px 38px color-mix(in srgb, var(--mission-accent) 14%, transparent); }
+.company-mission::before { content: ''; position: absolute; width: 140px; height: 140px; right: -60px; top: -75px; border-radius: 50%; background: var(--mission-accent); opacity: 0.09; filter: blur(2px); pointer-events: none; }
+.mission-tone-2 { --mission-accent: #11a987; --mission-soft: #ddfff5; }
+.mission-tone-3 { --mission-accent: #f08a3c; --mission-soft: #fff0dd; }
+.mission-tone-4 { --mission-accent: #e94c86; --mission-soft: #ffe4ef; }
+.mission-tone-5 { --mission-accent: #308dcc; --mission-soft: #dff3ff; }
+.company-mission.is-skipped { opacity: 0.55; filter: grayscale(0.45); }
+.company-mission.is-sent { animation: mission-celebrate 700ms cubic-bezier(0.22, 1, 0.36, 1); border-color: color-mix(in srgb, #19ae77 46%, var(--line)); }
+.mission-topline { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.65rem; }
+.mission-company-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 14px; color: #fff; background: linear-gradient(145deg, color-mix(in srgb, var(--mission-accent) 76%, #fff), var(--mission-accent)); box-shadow: 0 8px 18px color-mix(in srgb, var(--mission-accent) 24%, transparent); font-size: 1rem; font-weight: 800; }
+.mission-kicker { margin: 0 0 0.12rem; color: var(--muted); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.mission-topline h3 { margin: 0; overflow: hidden; font-size: 1rem; text-overflow: ellipsis; white-space: nowrap; }
+.mission-fit { display: grid; justify-items: center; color: var(--mission-accent); font-size: 0.61rem; line-height: 1; text-transform: uppercase; }
+.mission-fit span { font-size: 1.28rem; letter-spacing: -0.05em; }
+.mission-role { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 0.5rem; }
+.mission-role > svg { margin-top: 0.12rem; color: var(--mission-accent); }
+.mission-role div { display: grid; gap: 0.15rem; min-width: 0; }
+.mission-role strong { font-size: 0.86rem; }
+.mission-role span { color: var(--muted); font-size: 0.72rem; }
+.mission-reason { margin: 0; color: color-mix(in srgb, var(--ink) 82%, var(--muted)); font-size: 0.78rem; line-height: 1.48; }
+.mission-actions { display: flex; gap: 0.5rem; margin-top: auto; }
+.mission-button { position: relative; isolation: isolate; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 0.38rem; min-height: 39px; padding: 0.62rem 0.78rem; border: 0; border-radius: 13px; font: 720 0.72rem/1 inherit; cursor: pointer; transition: transform 150ms ease, box-shadow 180ms ease, filter 180ms ease; }
+.mission-button::before { content: ''; position: absolute; inset: -50%; z-index: -1; background: conic-gradient(from 90deg, transparent, rgb(255 255 255 / 72%), #ffde68, transparent 40%); opacity: 0; transform: translateX(-45%) rotate(0); }
+.mission-button.is-primary { flex: 1; color: #fff; background: linear-gradient(135deg, var(--mission-accent), color-mix(in srgb, var(--mission-accent) 72%, #34257d)); box-shadow: 0 8px 18px color-mix(in srgb, var(--mission-accent) 24%, transparent); }
+.mission-button.is-quiet { color: var(--muted); background: color-mix(in srgb, var(--mission-accent) 7%, var(--paper)); outline: 1px solid color-mix(in srgb, var(--mission-accent) 14%, var(--line)); }
+.mission-button:hover:not(:disabled) { transform: translateY(-2px) scale(1.015); filter: saturate(1.16); box-shadow: 0 13px 26px color-mix(in srgb, var(--mission-accent) 28%, transparent); }
+.mission-button:hover:not(:disabled)::before { opacity: 0.8; animation: mission-flash 700ms ease-out; }
+.mission-button:active:not(:disabled) { transform: translateY(1px) scale(0.96); filter: saturate(1.45) brightness(1.08); }
+.mission-button:active:not(:disabled)::before { opacity: 1; animation: mission-press-flash 220ms ease-out; }
+.mission-button:disabled { cursor: default; opacity: 0.55; box-shadow: none; }
+.mission-chat { display: grid; gap: 0.38rem; padding-top: 0.2rem; animation: agent-bubble-in 360ms cubic-bezier(0.22, 1, 0.36, 1); }
+.mission-bubble { width: fit-content; max-width: 91%; margin: 0; padding: 0.52rem 0.65rem; border-radius: 14px; font-size: 0.72rem; line-height: 1.4; }
+.mission-bubble.is-agent { justify-self: end; color: #fff; border-bottom-right-radius: 4px; background: linear-gradient(135deg, var(--mission-accent), #4a3cae); }
+.mission-bubble.is-employer { border: 1px solid color-mix(in srgb, #16a37a 18%, var(--line)); border-bottom-left-radius: 4px; background: color-mix(in srgb, #39d6a5 10%, var(--paper)); }
+.mission-chat.is-fault .mission-bubble.is-employer, .mission-chat.is-refused .mission-bubble.is-employer { border-color: color-mix(in srgb, #ec765c 26%, var(--line)); background: color-mix(in srgb, #ffddda 34%, var(--paper)); }
+.agent-proof { margin-top: 0.18rem; }
+.agent-proof summary { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.38rem 0.55rem; border-radius: 10px; color: #6552c5; background: color-mix(in srgb, #7562e6 8%, var(--paper)); font-size: 0.67rem; font-weight: 720; cursor: pointer; list-style: none; transition: color 160ms ease, background 160ms ease, transform 160ms ease; }
+.agent-proof summary::-webkit-details-marker { display: none; }
+.agent-proof summary:hover { color: #fff; background: linear-gradient(135deg, #715fe4, #2caa91); transform: translateY(-1px); }
+.agent-proof summary svg:last-child { transition: transform 180ms ease; }
+.agent-proof[open] summary svg:last-child { transform: rotate(90deg); }
+.agent-proof-card { display: grid; gap: 0.42rem; margin-top: 0.5rem; padding: 0.7rem; border: 1px dashed color-mix(in srgb, #7562e6 34%, var(--line)); border-radius: 12px; background: color-mix(in srgb, #17152f 96%, var(--paper)); color: #f7f6ff; animation: proof-reveal 240ms ease-out; }
+.agent-proof-card p { display: grid; grid-template-columns: 94px minmax(0, 1fr); gap: 0.4rem; margin: 0; }
+.agent-proof-card span, .agent-proof-card small { color: rgb(255 255 255 / 58%); font-size: 0.61rem; }
+.agent-proof-card code { overflow-wrap: anywhere; color: #bfffe8; font-size: 0.61rem; }
+.mission-empty { display: grid; justify-items: center; gap: 0.3rem; padding: 2rem 1rem; border: 1px dashed color-mix(in srgb, #7765ed 25%, var(--line)); border-radius: 18px; text-align: center; }
+.mission-empty svg { color: #e6a62d; }
+.mission-empty h3, .mission-empty p { margin: 0; }
+.mission-empty p { color: var(--muted); font-size: 0.8rem; }
+
 @keyframes agent-bubble-in { from { opacity: 0; transform: translateY(10px) scale(0.98); } to { opacity: 1; transform: none; } }
 @keyframes agent-panel-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes button-shimmer { to { transform: translateX(120%); } }
 @keyframes card-celebrate { 0% { transform: scale(1); } 35% { transform: scale(1.018); box-shadow: 0 0 0 6px rgb(43 202 150 / 14%), 0 24px 50px rgb(43 202 150 / 16%); } 100% { transform: scale(1); } }
+@keyframes mission-flash { from { transform: translateX(-48%) rotate(0); } to { transform: translateX(48%) rotate(22deg); } }
+@keyframes mission-press-flash { from { transform: scale(0.3); opacity: 1; } to { transform: scale(1.2); opacity: 0; } }
+@keyframes mission-celebrate { 0% { transform: scale(1); } 42% { transform: scale(1.018); box-shadow: 0 0 0 7px rgb(51 211 157 / 14%), 0 22px 42px rgb(51 211 157 / 18%); } 100% { transform: scale(1); } }
+@keyframes proof-reveal { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 640px) {
   .alumni-list { grid-template-columns: 1fr; }
@@ -1280,15 +1347,27 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .agent-view-tabs button { flex: none; }
   .agent-phone { margin-inline: -4px; border-radius: 20px; }
   .agent-chat > li { max-width: 92%; }
+  .mission-board { margin-inline: -4px; border-radius: 20px; }
+  .mission-board-head { align-items: flex-start; }
+  .mission-grid { grid-template-columns: 1fr; }
+  .mission-actions { align-items: stretch; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .alumni-list > li,
   .alumni-connect,
-  .agent-view-tabs button { transition: none; }
+  .agent-view-tabs button,
+  .agent-quest-progress span,
+  .company-mission,
+  .mission-button,
+  .agent-proof summary { transition: none; }
   .alumni-list > li.is-celebrating,
   .agent-view-panel,
   .agent-chat > li,
-  .alumni-bubble { animation: none; }
-  .alumni-connect::after { display: none; }
+  .alumni-bubble,
+  .company-mission.is-sent,
+  .mission-chat,
+  .agent-proof-card { animation: none; }
+  .alumni-connect::after,
+  .mission-button::before { display: none; }
 }
