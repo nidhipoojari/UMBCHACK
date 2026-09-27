@@ -29,6 +29,13 @@ function cardName(card: PipelineCard): string {
  * <select> on each card: keyboard and screen-reader friendly, and there is no
  * drag and drop to be the only way in. A card only moves once the server has
  * recorded the change, every move is announced, and focus follows the card.
+ *
+ * The <select> sits on the card face, not inside the "Details" disclosure. The
+ * board exists to answer "where is this role now", so changing that answer
+ * should not cost a disclosure click first. Drag and drop was the other way to
+ * make a move one gesture and was rejected again here: it is a second,
+ * pointer-only path to the same write, and everything it would need — a
+ * keyboard fallback, a live region, an undo — is what the <select> already is.
  */
 export function PipelineBoard() {
   const [cards, setCards] = useState<PipelineCard[] | null>(null);
@@ -37,7 +44,6 @@ export function PipelineBoard() {
   const [error, setError] = useState<string | null>(null);
   const [savingJobId, setSavingJobId] = useState<string | null>(null);
   const focusJobId = useRef<string | null>(null);
-  const [movedJobId, setMovedJobId] = useState<string | null>(null);
 
   const selectRefs = useRef(new Map<string, HTMLSelectElement>());
 
@@ -61,7 +67,9 @@ export function PipelineBoard() {
     };
   }, []);
 
-  // Changing a stage remounts the card in its new column; put focus back on its <select>.
+  // Changing a stage remounts the card in its new column; put focus back on its
+  // <select>. That <select> is on the card face and so always mounted, which is
+  // why this no longer has to prise a disclosure open first.
   useEffect(() => {
     if (!focusJobId.current) return;
     selectRefs.current.get(focusJobId.current)?.focus();
@@ -91,7 +99,6 @@ export function PipelineBoard() {
       if (!response.ok) throw new Error(payload.error ?? `Could not save (${response.status}).`);
 
       focusJobId.current = card.job_id;
-      setMovedJobId(card.job_id);
       setCards((current) =>
         (current ?? []).map((existing) =>
           existing.job_id === card.job_id
@@ -170,7 +177,6 @@ export function PipelineBoard() {
                         key={card.job_id}
                         card={card}
                         saving={savingJobId === card.job_id}
-                        startOpen={movedJobId === card.job_id}
                         onChange={change}
                         registerRef={(element) => {
                           if (element) selectRefs.current.set(card.job_id, element);
@@ -192,21 +198,18 @@ export function PipelineBoard() {
 function Card({
   card,
   saving,
-  startOpen,
   onChange,
   registerRef,
 }: {
   card: PipelineCard;
   saving: boolean;
-  startOpen: boolean;
   onChange: (card: PipelineCard, next: PipelineStatus, note?: string) => Promise<void>;
   registerRef: (element: HTMLSelectElement | null) => void;
 }) {
   const selectId = `pipe-status-${card.job_id}`;
+  const hintId = `pipe-hint-${card.job_id}`;
   const noteId = `pipe-note-${card.job_id}`;
   const [note, setNote] = useState('');
-  // A card that just moved mounts open, so its <select> can take focus again.
-  const [open, setOpen] = useState(startOpen);
   const stalled = stalledSentence(card);
   const role = card.title ?? 'this role';
   const company = card.company ?? 'this company';
@@ -226,6 +229,42 @@ function Card({
 
       {stalled ? <p className="pipe-card-stalled">{stalled}</p> : null}
 
+      <div className="pipe-field pipe-card-stage">
+        <label htmlFor={selectId}>
+          Stage
+          <span className="sr-only">
+            {' '}
+            for {role} at {company}
+          </span>
+        </label>
+        <select
+          id={selectId}
+          ref={registerRef}
+          className="pipe-select"
+          value={card.status}
+          aria-busy={saving}
+          aria-describedby={hintId}
+          onChange={(event) => {
+            // The note box lives in the disclosure below; whatever is typed
+            // there rides along with the move rather than needing its own save.
+            void onChange(card, event.target.value as PipelineStatus, note || undefined);
+          }}
+        >
+          {PIPELINE_STATUSES.map((stage) => (
+            <option key={stage} value={stage}>
+              {STATUS_LABEL[stage]}
+            </option>
+          ))}
+        </select>
+        {/* Short on the face, because it repeats once per card down the column.
+            The full sentence is the select's description, for anyone who asks
+            the control what it does rather than reading past it. */}
+        <p id={hintId} className="pipe-muted pipe-field-hint">
+          {saving ? 'Saving…' : 'Logged, never overwritten.'}
+          <span className="sr-only"> Each change is added to this role’s history; nothing is replaced.</span>
+        </p>
+      </div>
+
       {offersInterview(card.status) ? (
         <div className="pipe-card-rehearse">
           <StartInterviewButton
@@ -237,9 +276,13 @@ function Card({
         </div>
       ) : null}
 
-      <details className="pipe-card-more" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      {/* Uncontrolled again. It used to be forced open on the card that had just
+          moved, purely so the <select> inside it could be refocused after the
+          remount; the <select> is on the face now, so that prop only made a
+          moved card expand for no reason the reader asked for. */}
+      <details className="pipe-card-more">
         <summary>
-          Details and stage
+          Details and notes
           <span className="sr-only">
             {' '}
             for {role} at {company}
@@ -270,36 +313,6 @@ function Card({
             </a>
           </p>
         ) : null}
-
-        <div className="pipe-field">
-          <label htmlFor={selectId}>
-            Stage
-            <span className="sr-only">
-              {' '}
-              for {role} at {company}
-            </span>
-          </label>
-          <select
-            id={selectId}
-            ref={registerRef}
-            className="pipe-select"
-            value={card.status}
-            aria-busy={saving}
-            aria-describedby={noteId}
-            onChange={(event) => {
-              void onChange(card, event.target.value as PipelineStatus, note || undefined);
-            }}
-          >
-            {PIPELINE_STATUSES.map((stage) => (
-              <option key={stage} value={stage}>
-                {STATUS_LABEL[stage]}
-              </option>
-            ))}
-          </select>
-          <p id={noteId} className="pipe-muted pipe-field-hint">
-            {saving ? 'Saving…' : 'Each change is added to this role’s history. Nothing is overwritten.'}
-          </p>
-        </div>
 
         <label className="pipe-note-label" htmlFor={`${noteId}-input`}>
           Note<span className="sr-only"> for {role}</span>

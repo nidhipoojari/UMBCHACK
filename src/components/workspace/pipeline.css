@@ -117,6 +117,22 @@
 @keyframes pipe-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pipeline-save .spin { animation: none; } }
 
+/* The stage control on the card face. Inside the disclosure it was styled as a
+   bare underline, which reads as a control once you have already chosen to
+   open a form. On the face it has to look pressable at a glance among seven
+   columns of prose, so it gets a box. It borrows the note textarea's border
+   and 10px radius rather than .ws-button's pill: --control-radius is 999px,
+   which on a select puts the native dropdown arrow inside a curve. No new
+   colour — the palette is unchanged. */
+.pipe-card-stage { margin-top: 12px; }
+.pipe-card-stage .pipe-select {
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 16px;
+}
+.pipe-card-stage .pipe-field-hint { font-size: 12.5px; letter-spacing: 0.01em; }
+
 .pipe-card-rehearse { margin-top: 12px; }
 .pipe-rehearse-button { font-size: 14px; padding: 7px 14px; }
 
