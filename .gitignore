@@ -49,3 +49,7 @@ next-env.d.ts
 
 # local planning docs, not part of the app
 /docs/
+
+# agent identity keys — never commit a private key
+functions/**/*.key
+functions/**/*.pem
