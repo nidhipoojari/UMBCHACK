@@ -52,15 +52,22 @@ export class GeminiError extends Error {
   }
 }
 
+type GenerateOptions = { json?: boolean; temperature?: number; model?: string; timeoutMs?: number };
+
+/** Text and inline media (audio, images) for one model turn. */
+export type ContentPart = { text: string } | { inlineData: { mimeType: string; data: string } };
+
 /** One prompt in, the model's text out. `json` asks for a JSON response. */
-export async function generateText(
-  prompt: string,
-  options: { json?: boolean; temperature?: number; model?: string; timeoutMs?: number } = {},
-): Promise<string> {
+export async function generateText(prompt: string, options: GenerateOptions = {}): Promise<string> {
+  return generateFromParts([{ text: prompt }], options);
+}
+
+/** Like generateText, for a prompt that carries media, such as a recording to transcribe. */
+export async function generateFromParts(parts: ContentPart[], options: GenerateOptions = {}): Promise<string> {
   try {
     const response = await (await genai()).models.generateContent({
       model: options.model ?? GEMINI_MODEL,
-      contents: prompt,
+      contents: [{ role: 'user', parts }],
       config: {
         temperature: options.temperature,
         responseMimeType: options.json ? 'application/json' : undefined,
@@ -74,6 +81,54 @@ export async function generateText(
     if (error instanceof GeminiError) throw error;
     throw new GeminiError(error instanceof Error ? error.message : String(error), { cause: error });
   }
+}
+
+export const TTS_MODEL = process.env.GEMINI_TTS_MODEL ?? 'gemini-2.5-flash-tts';
+const TTS_VOICE = process.env.GEMINI_TTS_VOICE ?? 'Kore';
+
+/**
+ * Text to speech with Gemini. Returns a WAV file: the model sends raw 16-bit
+ * mono PCM (24 kHz unless its MIME type says otherwise), which gets a header
+ * here so a browser <audio> element can play it directly.
+ */
+export async function synthesizeSpeech(text: string, options: { style?: string; timeoutMs?: number } = {}): Promise<Buffer> {
+  let data: string | undefined;
+  let mimeType = '';
+  try {
+    const response = await (await genai()).models.generateContent({
+      model: TTS_MODEL,
+      contents: options.style ? `${options.style}: ${text}` : text,
+      config: {
+        responseModalities: ['AUDIO'],
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: TTS_VOICE } } },
+        abortSignal: AbortSignal.timeout(options.timeoutMs ?? 30_000),
+      },
+    });
+    const part = response.candidates?.[0]?.content?.parts?.find((item) => item.inlineData?.data);
+    data = part?.inlineData?.data;
+    mimeType = part?.inlineData?.mimeType ?? '';
+  } catch (error) {
+    throw new GeminiError(error instanceof Error ? error.message : String(error), { cause: error });
+  }
+  if (!data) throw new GeminiError('Gemini returned no audio.');
+
+  const pcm = Buffer.from(data, 'base64');
+  const rate = Number(/rate=(\d+)/.exec(mimeType)?.[1] ?? 24_000);
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(1, 22); // mono
+  header.writeUInt32LE(rate, 24);
+  header.writeUInt32LE(rate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]);
 }
 
 /** Parses a JSON object from model output, tolerating a ```json fence around it. */

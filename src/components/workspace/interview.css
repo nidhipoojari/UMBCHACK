@@ -1,0 +1,136 @@
+/* The mock interview room: self-view and interviewer on the left, the question
+   and answer on the right. One column below 900px, never a sideways scroll. */
+
+.iv-head { padding: 14px 0 22px; max-width: 64ch; }
+.iv-title { font-size: clamp(28px, 3.6vw, 42px); margin: 10px 0 8px; max-width: 26ch; }
+
+.iv-muted { color: var(--muted); line-height: 1.6; }
+.iv-small { font-size: 14px; margin: 8px 0 0; }
+.iv-warn { color: var(--failure); line-height: 1.6; font-size: 15px; }
+
+.iv-panel { max-width: 64ch; padding: 10px 0 60px; display: grid; gap: 14px; justify-items: start; }
+.iv-panel h2 { font-size: 24px; }
+
+.iv-h3 {
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+/* The status line: visible and announced, with its height reserved so the
+   layout does not jump as it fills. */
+.iv-live { min-height: 1.6em; margin: 0 0 14px; color: var(--muted); }
+
+.iv-room { border-top: 1px solid var(--line); padding: 22px 0 80px; }
+
+.iv-stage {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .iv-stage { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+}
+
+.iv-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  object-fit: cover;
+  margin-bottom: 12px;
+  /* Mirrored: an unmirrored self-view is disorienting to rehearse in. */
+  transform: scaleX(-1);
+}
+
+.iv-voice { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 18px; }
+.iv-toggle { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 15px; cursor: pointer; }
+.iv-toggle input { inline-size: 18px; block-size: 18px; accent-color: var(--ink); }
+
+.iv-progress {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 10px;
+}
+
+.iv-question { border-inline-start: 2px solid var(--ink); padding: 4px 0 4px 20px; margin: 0 0 24px; }
+.iv-question-text { font-size: clamp(19px, 2vw, 23px); line-height: 1.4; margin: 0 0 8px; }
+
+.iv-label {
+  display: block;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.iv-answer {
+  display: block;
+  width: 100%;
+  font: inherit;
+  font-size: 17px;
+  line-height: 1.6;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  resize: vertical;
+}
+.iv-answer:hover,
+.iv-answer:focus { border-color: var(--ink); }
+
+/* Focus rings for the controls globals.css does not ring. */
+.iv-answer:focus-visible,
+.iv-hint summary:focus-visible,
+.iv-toggle input:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.iv-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+.iv-actions .ws-button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Recording is said in the label; the dashed border is a second, non-colour cue. */
+.iv-recording { border-style: dashed; border-color: var(--failure); color: var(--failure); }
+
+.iv-hint { margin: 12px 0 0; }
+.iv-hint summary { cursor: pointer; color: var(--muted); font-size: 15px; }
+.iv-hint ul { margin: 8px 0 0; padding-left: 20px; line-height: 1.6; }
+
+.iv-degraded { margin: 0 0 18px; padding-left: 20px; color: var(--muted); line-height: 1.6; font-size: 15px; }
+
+.iv-critiques { margin-top: 36px; border-top: 1px solid var(--line); padding-top: 22px; }
+.iv-critiques ol,
+.iv-critiques > ul { padding-left: 20px; margin: 0; }
+.iv-critiques li { margin-bottom: 14px; line-height: 1.6; }
+.iv-critiques li ul { padding-left: 18px; margin: 4px 0 0; }
+.iv-critiques li li { margin-bottom: 4px; }
+.iv-critique-q { margin: 0 0 4px; font-style: italic; color: var(--muted); }
+
+.iv-summary { font-size: clamp(17px, 1.7vw, 20px); line-height: 1.6; margin: 0 0 8px; max-width: 70ch; }
+
+.iv-back { margin: 0 0 4px; font-size: 15px; }
+.iv-back a { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); text-decoration: none; }
+.iv-back a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+
+/* The "Start mock interview" button, on the pipeline and the job page. */
+.iv-start { display: grid; gap: 6px; justify-items: start; }
+.iv-start .ws-button:disabled { opacity: 0.65; cursor: progress; }
+.iv-start-hint { margin: 0; font-size: 14px; color: var(--muted); }
+
+.jp-rehearse { border-top: 1px solid var(--line); padding-top: 26px; margin-top: 30px; display: grid; gap: 12px; max-width: 900px; }
+.jp-rehearse > h2 { font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.jp-rehearse > p { margin: 0; max-width: 62ch; line-height: 1.6; }
+
+/* The live interviewer's wave takes --ink from the cascade, so it follows the theme. */
+.iv-wave { display: block; width: 100%; height: auto; color: var(--ink); image-rendering: pixelated; margin: 4px 0 10px; }
+.iv-voice-button { margin-top: 10px; }
