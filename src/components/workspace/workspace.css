@@ -712,3 +712,17 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
     transition: none;
   }
 }
+/* --- Job matches ---------------------------------------------------------- */
+
+.ws-match h3 a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.ws-match h3 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ws-match h3 a svg { flex: none; align-self: center; color: var(--muted); }
+.ws-match__gap { margin-top: 8px !important; font-size: 14.5px !important; }
+.ws-match__why { margin-top: 6px !important; color: var(--ink) !important; font-size: 15.5px !important; line-height: 1.5; }
+.ws-match__basis { margin: 14px 0 0; color: var(--muted); font-size: 15px; }
