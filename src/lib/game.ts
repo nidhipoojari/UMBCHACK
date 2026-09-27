@@ -83,8 +83,8 @@ function daysBetween(later: string, earlier: string): number {
  * would quietly delete their history on the next dataset refresh — which is
  * the exact failure the loose reference was chosen to avoid.
  */
-async function loadHistory(userId: string): Promise<{ connections: Connection[]; clock: Clock }> {
-  const [rowsRes, clockRes] = await Promise.all([
+async function loadHistory(userId: string): Promise<{ connections: Connection[]; clock: Clock; streakResetAt: string | null }> {
+  const [rowsRes, clockRes, resetRes] = await Promise.all([
     db.query<{ campus_id: string; utc_day: string; at_utc: string; route: string | null }>(
       `SELECT c.campus_id,
               to_char(c.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS utc_day,
@@ -100,6 +100,12 @@ async function loadHistory(userId: string): Promise<{ connections: Connection[];
       `SELECT to_char((now() AT TIME ZONE 'UTC')::date, 'YYYY-MM-DD') AS today,
               to_char((now() AT TIME ZONE 'UTC')::date + 1,
                       'YYYY-MM-DD"T00:00:00.000Z"') AS next_midnight`,
+    ),
+    db.query<{ reset_at: string | null }>(
+      `SELECT to_char(reset_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS reset_at
+         FROM alumni_streak_resets
+        WHERE user_id = $1`,
+      [userId],
     ),
   ]);
 
@@ -117,6 +123,7 @@ async function loadHistory(userId: string): Promise<{ connections: Connection[];
           : null,
     })),
     clock: { today: clockRes.rows[0].today, nextMidnight: clockRes.rows[0].next_midnight },
+    streakResetAt: resetRes.rows[0]?.reset_at ?? null,
   };
 }
 
@@ -397,12 +404,15 @@ export async function gameStateFor(
   userId: string,
   cohortRoutes: { route: string; share: number }[],
 ): Promise<GameState> {
-  const { connections, clock } = await loadHistory(userId);
+  const { connections, clock, streakResetAt } = await loadHistory(userId);
   const stats = { routes: cohortRoutes };
+  const streakConnections = streakResetAt
+    ? connections.filter((connection) => connection.at > streakResetAt)
+    : connections;
 
   return {
     energy: energyFrom(connections, clock),
-    streak: streakFrom(connections, clock),
+    streak: streakFrom(streakConnections, clock),
     level: levelFor(connections.length * XP_PER_CONNECTION),
     achievements: achievementsFrom(connections, stats.routes.length),
     routes: routesFrom(connections, stats.routes),

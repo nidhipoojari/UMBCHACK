@@ -1166,10 +1166,19 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   font-size: 0.7rem;
 }
 .alumni-facts span.is-route { color: #5945b8; background: color-mix(in srgb, #806cff 11%, transparent); border-color: transparent; font-weight: 650; }
+.alumni-question-set { display: grid; gap: 0.55rem; margin: 0; padding: 0.72rem; border: 1px solid color-mix(in srgb, #f28a25 22%, var(--line)); border-radius: 14px; background: linear-gradient(135deg, color-mix(in srgb, #fff0c2 34%, var(--paper)), color-mix(in srgb, #f2edff 32%, var(--paper))); }
+.alumni-question-set legend { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0 0.28rem; color: #92500b; font-size: 0.7rem; font-weight: 750; }
+.alumni-question-chips { display: flex; flex-wrap: wrap; gap: 0.38rem; }
+.alumni-question-chips button { padding: 0.38rem 0.52rem; border: 1px solid color-mix(in srgb, #765de5 18%, var(--line)); border-radius: 999px; color: var(--muted); background: var(--paper); font: 650 0.66rem/1.2 inherit; cursor: pointer; transition: transform 150ms ease, color 150ms ease, background 150ms ease, box-shadow 150ms ease; }
+.alumni-question-chips button:hover { transform: translateY(-1px); color: #5842bd; box-shadow: 0 5px 12px rgb(69 50 145 / 10%); }
+.alumni-question-chips button[aria-pressed='true'] { color: #fff; border-color: transparent; background: linear-gradient(135deg, #f08a28, #7956dc); }
+.alumni-question-set label { display: grid; gap: 0.3rem; color: var(--muted); font-size: 0.64rem; }
+.alumni-question-set input { width: 100%; min-width: 0; padding: 0.52rem 0.62rem; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--paper); font: 0.72rem/1.35 inherit; }
 .alumni-mini-chat { display: grid; gap: 0.4rem; padding-top: 0.15rem; }
 .alumni-bubble { width: fit-content; max-width: 88%; padding: 0.55rem 0.7rem; border-radius: 14px 14px 14px 4px; font-size: 0.76rem; line-height: 1.45; animation: agent-bubble-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .alumni-bubble.is-sent { justify-self: end; display: flex; align-items: center; gap: 0.3rem; color: #fff; background: linear-gradient(135deg, #6f5cf4, #4f43b7); border-radius: 14px 14px 4px 14px; }
 .alumni-bubble.is-received { background: color-mix(in srgb, #23b594 10%, var(--paper)); border: 1px solid color-mix(in srgb, #16a37a 20%, var(--line)); }
+.alumni-bubble.is-progress { display: flex; align-items: center; gap: 0.35rem; color: #76520e; border: 1px solid color-mix(in srgb, #f0a12f 24%, var(--line)); background: color-mix(in srgb, #fff0b6 45%, var(--paper)); }
 .alumni-card-foot { margin-top: auto; padding-top: 0.75rem; border-top: 1px solid color-mix(in srgb, currentColor 8%, transparent); display: flex; gap: 0.6rem; align-items: center; justify-content: space-between; }
 .alumni-privacy { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--muted); font-size: 0.68rem; }
 .alumni-connect {
@@ -1241,7 +1250,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .agent-phone > .a2a-filters { margin: 0; padding: 0.75rem 1rem 0; }
 .agent-phone .a2a-filter { border-color: color-mix(in srgb, #7666ec 18%, var(--line)); }
 .agent-phone .a2a-filter[aria-pressed='true'] { color: #fff; background: #5f50c8; }
-.agent-chat { list-style: none; margin: 0; padding: 1rem; display: grid; gap: 1rem; max-height: 720px; overflow-y: auto; scrollbar-width: thin; }
+.agent-chat { list-style: none; margin: 0; padding: 1rem; display: grid; gap: 1rem; }
 .agent-chat > li { display: grid; max-width: min(84%, 570px); animation: agent-bubble-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 .agent-chat > li.is-mine { justify-self: end; justify-items: end; }
 .agent-chat > li.is-theirs { justify-self: start; justify-items: start; }
@@ -1261,6 +1270,8 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .agent-receipt code { overflow-wrap: anywhere; font-size: 0.66rem; }
 .agent-receipt p { grid-column: 1 / -1; margin: 0; }
 .agent-phone-foot { display: flex; align-items: center; justify-content: center; gap: 0.4rem; margin: 0; padding: 0.75rem 1rem; border-top: 1px solid color-mix(in srgb, #6e61cf 12%, var(--line)); color: var(--muted); background: color-mix(in srgb, #6e61cf 4%, var(--paper)); font-size: 0.7rem; text-align: center; }
+.agent-chat-empty { display: grid; justify-items: center; gap: 0.38rem; margin: 1rem; padding: 2rem 1rem; border: 1px dashed color-mix(in srgb, #7765ed 26%, var(--line)); border-radius: 18px; color: #6752c5; text-align: center; background: color-mix(in srgb, #7865ea 5%, var(--paper)); }
+.agent-chat-empty p { max-width: 420px; margin: 0; color: var(--muted); font-size: 0.78rem; }
 
 .agent-view-panel .a2a-defences li.is-fired { border-color: color-mix(in srgb, #6f5ce4 28%, var(--line)); background: linear-gradient(145deg, color-mix(in srgb, #7867ee 6%, var(--card)), var(--card)); }
 .agent-view-panel .a2a-agent { border-radius: 16px; }
@@ -1276,6 +1287,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .mission-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.85rem; }
 .company-mission { --mission-accent: #7763e7; --mission-soft: #eeeaff; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 0.85rem; min-width: 0; padding: 1rem; border: 1px solid color-mix(in srgb, var(--mission-accent) 20%, var(--line)); border-radius: 20px; background: color-mix(in srgb, var(--mission-soft) 25%, var(--paper)); box-shadow: 0 10px 28px rgb(47 41 91 / 7%); transition: transform 190ms ease, box-shadow 190ms ease, opacity 190ms ease, filter 190ms ease; }
 .company-mission:hover { transform: translateY(-3px); box-shadow: 0 18px 38px color-mix(in srgb, var(--mission-accent) 14%, transparent); }
+.company-mission.is-selected { border-color: color-mix(in srgb, var(--mission-accent) 62%, var(--line)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--mission-accent) 12%, transparent), 0 18px 38px color-mix(in srgb, var(--mission-accent) 14%, transparent); }
 .company-mission::before { content: ''; position: absolute; width: 140px; height: 140px; right: -60px; top: -75px; border-radius: 50%; background: var(--mission-accent); opacity: 0.09; filter: blur(2px); pointer-events: none; }
 .mission-tone-2 { --mission-accent: #11a987; --mission-soft: #ddfff5; }
 .mission-tone-3 { --mission-accent: #f08a3c; --mission-soft: #fff0dd; }
@@ -1295,11 +1307,13 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .mission-role strong { font-size: 0.86rem; }
 .mission-role span { color: var(--muted); font-size: 0.72rem; }
 .mission-reason { margin: 0; color: color-mix(in srgb, var(--ink) 82%, var(--muted)); font-size: 0.78rem; line-height: 1.48; }
-.mission-actions { display: flex; gap: 0.5rem; margin-top: auto; }
+.mission-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: auto; }
 .mission-button { position: relative; isolation: isolate; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; gap: 0.38rem; min-height: 39px; padding: 0.62rem 0.78rem; border: 0; border-radius: 13px; font: 720 0.72rem/1 inherit; cursor: pointer; transition: transform 150ms ease, box-shadow 180ms ease, filter 180ms ease; }
 .mission-button::before { content: ''; position: absolute; inset: -50%; z-index: -1; background: conic-gradient(from 90deg, transparent, rgb(255 255 255 / 72%), #ffde68, transparent 40%); opacity: 0; transform: translateX(-45%) rotate(0); }
 .mission-button.is-primary { flex: 1; color: #fff; background: linear-gradient(135deg, var(--mission-accent), color-mix(in srgb, var(--mission-accent) 72%, #34257d)); box-shadow: 0 8px 18px color-mix(in srgb, var(--mission-accent) 24%, transparent); }
 .mission-button.is-quiet { color: var(--muted); background: color-mix(in srgb, var(--mission-accent) 7%, var(--paper)); outline: 1px solid color-mix(in srgb, var(--mission-accent) 14%, var(--line)); }
+.mission-button.is-chat { flex-basis: 100%; color: var(--mission-accent); background: color-mix(in srgb, var(--mission-accent) 8%, var(--paper)); outline: 1px solid color-mix(in srgb, var(--mission-accent) 18%, var(--line)); }
+.mission-button.is-chat[aria-pressed='true'] { color: #fff; background: linear-gradient(135deg, var(--mission-accent), #3daf9a); }
 .mission-button:hover:not(:disabled) { transform: translateY(-2px) scale(1.015); filter: saturate(1.16); box-shadow: 0 13px 26px color-mix(in srgb, var(--mission-accent) 28%, transparent); }
 .mission-button:hover:not(:disabled)::before { opacity: 0.8; animation: mission-flash 700ms ease-out; }
 .mission-button:active:not(:disabled) { transform: translateY(1px) scale(0.96); filter: saturate(1.45) brightness(1.08); }
@@ -1356,6 +1370,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 @media (prefers-reduced-motion: reduce) {
   .alumni-list > li,
   .alumni-connect,
+  .alumni-question-chips button,
   .agent-view-tabs button,
   .agent-quest-progress span,
   .company-mission,

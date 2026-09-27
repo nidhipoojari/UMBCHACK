@@ -132,7 +132,10 @@ type Match = {
 
 type Attempt = {
   jobId: string;
+  jti: string | null;
+  sentAt: string;
   accepted: boolean;
+  reasons: string[];
 };
 
 type ApplyContext = {
@@ -333,8 +336,10 @@ function CompanyMission({
   skipped,
   pending,
   outcome,
+  selected,
   onApply,
   onSkip,
+  onSelect,
 }: {
   match: Match;
   index: number;
@@ -343,15 +348,17 @@ function CompanyMission({
   skipped: boolean;
   pending: boolean;
   outcome?: ApplyOutcome;
+  selected: boolean;
   onApply: () => void;
   onSkip: () => void;
+  onSelect: () => void;
 }) {
   const company = match.company?.trim() || 'Employer';
   const fit = Math.round(match.score * 100);
   const sent = already || outcome?.accepted === true;
 
   return (
-    <article className={`company-mission mission-tone-${(index % 5) + 1}${skipped ? ' is-skipped' : ''}${sent ? ' is-sent' : ''}`}>
+    <article className={`company-mission mission-tone-${(index % 5) + 1}${skipped ? ' is-skipped' : ''}${sent ? ' is-sent' : ''}${selected ? ' is-selected' : ''}`}>
       <div className="mission-topline">
         <span className="mission-company-mark" aria-hidden="true">{company.charAt(0).toUpperCase()}</span>
         <div>
@@ -384,6 +391,9 @@ function CompanyMission({
         <button type="button" className="mission-button is-quiet" disabled={pending || sent} onClick={onSkip}>
           {skipped ? <><Undo2 size={14} aria-hidden="true" /> Bring back</> : 'Not for me'}
         </button>
+        <button type="button" className="mission-button is-chat" aria-pressed={selected} onClick={onSelect}>
+          <MessageCircle size={14} aria-hidden="true" /> {selected ? 'Chat open' : 'Open chat'}
+        </button>
       </div>
     </article>
   );
@@ -399,6 +409,7 @@ export function AgentMenu() {
   const [pending, setPending] = useState<string | null>(null);
   const [outcomes, setOutcomes] = useState<Record<string, ApplyOutcome>>({});
   const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -435,12 +446,6 @@ export function AgentMenu() {
     };
   }, [load]);
 
-  const feed = useMemo(() => {
-    if (!data) return [];
-    if (filter === 'all') return data.feed;
-    return data.feed.filter((entry) => entry.decision === filter);
-  }, [data, filter]);
-
   const missions = useMemo(() => {
     const companies = new Set<string>();
     return (applyContext?.matches ?? []).filter((match) => {
@@ -451,7 +456,32 @@ export function AgentMenu() {
     }).slice(0, 5);
   }, [applyContext]);
 
+  useEffect(() => {
+    if (!selectedJobId && missions[0]) setSelectedJobId(missions[0].job_id);
+    if (selectedJobId && missions.length && !missions.some((match) => match.job_id === selectedJobId)) {
+      setSelectedJobId(missions[0].job_id);
+    }
+  }, [missions, selectedJobId]);
+
+  const selectedMission = missions.find((match) => match.job_id === selectedJobId) ?? missions[0] ?? null;
+  const selectedJtis = useMemo(
+    () => new Set(
+      (applyContext?.sent ?? [])
+        .filter((attempt) => attempt.jobId === selectedMission?.job_id && attempt.jti)
+        .map((attempt) => attempt.jti as string),
+    ),
+    [applyContext, selectedMission?.job_id],
+  );
+  const feed = useMemo(() => {
+    if (!data || !selectedMission) return [];
+    const companyFeed = data.feed.filter((entry) => entry.jti && selectedJtis.has(entry.jti));
+    if (filter === 'all') return companyFeed;
+    return companyFeed.filter((entry) => entry.decision === filter);
+  }, [data, filter, selectedJtis, selectedMission]);
+
   const apply = useCallback(async (jobId: string) => {
+    setSelectedJobId(jobId);
+    setView('line');
     setPending(jobId);
     setMissionError(null);
     try {
@@ -545,6 +575,11 @@ export function AgentMenu() {
             <LockKeyhole size={15} aria-hidden="true" /> Complete {applyContext.missing.join(' and ')} before your agent can make an introduction.
           </p>
         ) : null}
+        {applyContext && applyContext.missing.length === 0 && !applyContext.ourFingerprint ? (
+          <p className="mission-lock-note" role="status">
+            <LockKeyhole size={15} aria-hidden="true" /> Secure signing is reconnecting. Nothing will send without a valid key.
+          </p>
+        ) : null}
 
         {missions.length ? (
           <div className="mission-grid">
@@ -558,6 +593,7 @@ export function AgentMenu() {
                 skipped={skipped.has(match.job_id)}
                 pending={pending === match.job_id}
                 outcome={outcomes[match.job_id]}
+                selected={selectedMission?.job_id === match.job_id}
                 onApply={() => void apply(match.job_id)}
                 onSkip={() => setSkipped((current) => {
                   const next = new Set(current);
@@ -565,6 +601,10 @@ export function AgentMenu() {
                   else next.add(match.job_id);
                   return next;
                 })}
+                onSelect={() => {
+                  setSelectedJobId(match.job_id);
+                  setView('line');
+                }}
               />
             ))}
           </div>
@@ -701,8 +741,8 @@ export function AgentMenu() {
         <header className="agent-phone-head">
           <div className="agent-phone-avatar"><Bot size={20} aria-hidden="true" /></div>
           <div>
-            <h2 id="feed-h">Your agent line</h2>
-            <span><i /> end-to-end encrypted · newest first</span>
+            <h2 id="feed-h">{selectedMission?.company ?? 'Your agent line'}</h2>
+            <span><i /> {selectedMission?.title ?? 'Choose a company mission'} · end-to-end encrypted</span>
           </div>
           <LockKeyhole size={18} aria-label="Encrypted" />
         </header>
@@ -721,10 +761,21 @@ export function AgentMenu() {
           ))}
         </div>
 
-        {feed.length === 0 ? (
-          <p className="muted">Nothing in the trail matches that filter.</p>
+        {pending === selectedMission?.job_id ? (
+          <ol className="agent-chat is-live" aria-live="polite">
+            <li className="is-mine is-accepted">
+              <div className="agent-bubble-who"><Bot size={13} aria-hidden="true" /><strong>Your agent</strong></div>
+              <div className="agent-bubble"><span className="agent-bubble-status"><Loader2 size={12} className="spin" aria-hidden="true" /> Signing</span><p>Encrypting your introduction for {selectedMission?.company ?? 'the employer'}…</p></div>
+            </li>
+          </ol>
+        ) : feed.length === 0 ? (
+          <div className="agent-chat-empty">
+            <MessageCircle size={20} aria-hidden="true" />
+            <strong>{selectedMission ? `Ready for ${selectedMission.company ?? 'this company'}` : 'Choose a company'}</strong>
+            <p>{filter === 'all' ? 'Approve the mission above and the agent exchange will appear here live.' : 'No messages for this company match that filter.'}</p>
+          </div>
         ) : (
-            <ol className="agent-chat" aria-live="polite">
+          <ol className="agent-chat" aria-live="polite">
             {feed.map((entry) => {
               const refused = entry.decision === 'refused';
               return (
