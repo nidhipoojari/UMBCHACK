@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The waiting screen, which is really a log viewer (ported from VT Hacks).
+ * The waiting screen, which is really a log viewer.
  *
  * The upload has already landed in the bucket by the time this renders, and
  * Eventarc has handed it to the extract-resume Cloud Function, which in turn

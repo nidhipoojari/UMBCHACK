@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Onboarding step one for applicants, ported from VT Hacks.
+ * Onboarding step one for applicants.
  *
  * No <nav>: intake is one screen and the only way out of it is adding the
  * file. Sign-in is checked by the form, which sends a signed-out visitor to

@@ -2,7 +2,7 @@
 
 /**
  * Resume upload. Required, and it submits itself: choosing the file IS the
- * action, so there is no Next button (as in VT Hacks).
+ * action, so there is no Next button.
  *
  * The file goes straight from the browser to the uploads bucket at
  *   applicants/<uid>/resumes/<document_id>.pdf

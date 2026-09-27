@@ -1,6 +1,5 @@
 /**
- * The extraction contract, ported from VT Hacks (src/lib/extract/types.ts and
- * gemini.ts): the output shape Gemini is asked for, the schema that cleans what
+ * The extraction contract: the output shape Gemini is asked for, the schema that cleans what
  * comes back, and the gap checks that turn missing fields into questions.
  */
 import { z } from 'zod';

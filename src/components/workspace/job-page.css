@@ -1,0 +1,123 @@
+/* The job page: what the role is, where you stand, the posting, the employer check. */
+
+.jp-back { margin: 0 0 4px; font-size: 15px; }
+.jp-back a { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); text-decoration: none; }
+.jp-back a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
+
+.jp-hero { padding: 18px 0 26px; }
+.jp-hero h1 { font-size: clamp(29px, 3.9vw, 44px); max-width: 28ch; margin: 10px 0 0; }
+
+.jp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 15px;
+}
+.jp-meta li + li { padding-left: 20px; border-left: 1px solid var(--line); }
+
+.jp-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 14px; margin-top: 26px; }
+/* The save button's note takes its own line under both controls. */
+.jp-cta .pipeline-save { display: contents; }
+.jp-cta .pipeline-save > p { flex-basis: 100%; }
+.jp-cta .secondary { display: inline-flex; align-items: center; gap: 6px; }
+
+.jp-jump { margin: 18px 0 0; font-size: 15px; }
+.jp-jump a { color: var(--muted); text-underline-offset: 4px; }
+.jp-jump a:hover { color: var(--ink); }
+
+.jp-match { border-top: 1px solid var(--line); padding-top: 26px; margin-top: 8px; display: grid; gap: 20px; max-width: 900px; }
+.jp-match > h2 { font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.jp-match__top { display: flex; align-items: flex-start; gap: 26px; }
+.jp-gauge { flex: none; display: flex; align-items: baseline; gap: 6px; margin: 0; font-variant-numeric: tabular-nums; }
+.jp-gauge b { font-size: clamp(44px, 7vw, 64px); font-weight: 400; line-height: 0.9; letter-spacing: -0.02em; }
+.jp-gauge span { color: var(--muted); font-size: 16px; }
+.jp-match__read { display: grid; gap: 8px; min-width: 0; }
+.jp-call {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding-left: 13px;
+  border-left: 2px solid var(--line-strong);
+}
+.jp-reason { margin: 0; line-height: 1.6; max-width: 68ch; overflow-wrap: break-word; }
+.jp-match__foot { margin: 0; color: var(--muted); font-size: 14.5px; line-height: 1.6; max-width: 72ch; }
+.jp-nomatch { border-top: 1px solid var(--line); padding-top: 24px; margin: 8px 0 0; color: var(--muted); line-height: 1.65; max-width: 72ch; }
+
+.jp-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin: 0; }
+.jp-lists > div { display: grid; gap: 6px; align-content: start; }
+.jp-lists small { letter-spacing: 0.14em; }
+.jp-chips { display: flex; flex-wrap: wrap; gap: 7px; padding: 0; margin: 0; list-style: none; }
+.jp-chips li { border: 1px solid var(--line-strong); border-radius: 999px; padding: 4px 11px; font-size: 14.5px; }
+.jp-chips--have li { border-color: var(--ink); }
+.jp-chips--gap li { border-style: dashed; color: var(--muted); }
+
+.jp-jd { margin-top: 20px; max-width: 78ch; }
+.jp-jd > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+  cursor: pointer;
+}
+.jp-jd > summary::-webkit-details-marker { display: none; }
+.jp-jd > summary:hover .jp-jd__open { text-decoration: underline; text-underline-offset: 4px; }
+.jp-jd__open::before { content: '+'; display: inline-block; width: 1.1em; color: var(--muted); }
+details[open] > summary .jp-jd__open::before { content: '–'; }
+.jp-jd__len { flex: none; color: var(--muted); font-size: 14px; letter-spacing: 0.1em; text-transform: uppercase; }
+.jp-jd__text { margin-top: 22px; white-space: pre-wrap; overflow-wrap: break-word; line-height: 1.68; font-size: 16.5px; }
+.jp-jd__src { margin: 22px 0 0; padding-top: 16px; border-top: 1px solid var(--line); font-size: 15px; }
+.jp-jd__src a { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
+
+/* Employer check and autofill */
+.jp-check header { align-items: flex-start; }
+.jp-tag {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+.jp-tag--known { border-color: var(--ink); }
+.jp-tag--unverified { border-style: dashed; }
+.jp-check-reason { margin: 0 0 14px; line-height: 1.6; max-width: 72ch; }
+.jp-signals { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 8px; max-width: 72ch; }
+.jp-signals li { padding-left: 14px; border-left: 2px solid var(--line-strong); color: var(--muted); line-height: 1.55; }
+.jp-signals li.is-pass { border-left-color: var(--ink); color: var(--ink); }
+.jp-actions { display: grid; gap: 10px; justify-items: start; }
+.jp-actions .primary { display: inline-flex; align-items: center; gap: 8px; }
+.jp-actions p { margin: 0; max-width: 62ch; }
+.jp-prepared { margin-top: 22px; display: grid; gap: 10px; }
+.jp-prepared p { margin: 0; }
+.jp-prepared-shot {
+  display: block;
+  width: 100%;
+  max-width: 720px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+}
+.jp-planned { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; max-width: 72ch; }
+.jp-planned li { padding-left: 14px; border-left: 2px solid var(--line-strong); line-height: 1.5; }
+.jp-planned li.is-ask { border-left-style: dashed; }
+.jp-planned span { display: block; color: var(--muted); font-size: 14px; }
+.jp-source-link a { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); }
+
+.jp-page .spin { animation: jp-spin 0.9s linear infinite; }
+@keyframes jp-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .jp-page .spin { animation: none; } }
+
+@media (max-width: 600px) {
+  .jp-match__top { flex-direction: column; gap: 14px; }
+}

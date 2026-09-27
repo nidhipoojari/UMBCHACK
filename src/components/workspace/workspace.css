@@ -1,8 +1,7 @@
 /* ===========================================================================
    WORKSPACE — the side nav, the chat drawer, and the placeholder pages.
 
-   Ported from VT Hacks (globals.css side nav, account.css, voice.css) onto
-   agentHire's tokens: white paper, ink, rounded cards, ink hairlines. The
+   Built on agentHire's tokens: white paper, ink, rounded cards, ink hairlines. The
    page-width variables (--nav-w, --drawer-w) and the body padding that makes
    room for both panels live in globals.css.
    =========================================================================== */
@@ -381,6 +380,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .ws-head { padding: 12px 0 28px; max-width: 64ch; }
 .ws-head h1 { font-size: clamp(32px, 4.6vw, 48px); line-height: 1.06; margin: 10px 0 12px; }
 .ws-head p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.6; }
+.ws-head p a { color: var(--ink); text-underline-offset: 3px; }
 
 /* Says, on every page, that the numbers are not real yet. */
 .ws-sample {
@@ -992,4 +992,85 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .ws-pill--route {
   background: color-mix(in srgb, currentColor 9%, transparent);
   font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ *
+ * Apply desk and employer mailbox — the two screens where the A2A wire
+ * produces something a person can read.
+ *
+ * The receipt is styled as EVIDENCE rather than as feedback. A refusal gets
+ * the same weight as an acceptance, the same layout and the same typeface,
+ * because the whole argument of these screens is that a refusal is a result
+ * and not a failure. Nothing here is red or green: colour would sort the two
+ * into "bad" and "good" before the reader has read either, and the audit trail
+ * elsewhere in this app already deliberately avoids that.
+ * ------------------------------------------------------------------ */
+.apply-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+.apply-note {
+  margin: 6px 0 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.apply-receipt {
+  margin-top: 0.7rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  gap: 0.45rem;
+}
+.apply-receipt.is-refused,
+.apply-receipt.is-fault {
+  border-left: 3px solid var(--ink);
+  border-radius: 0 12px 12px 0;
+  background: var(--wash);
+}
+.apply-verdict {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.95rem;
+}
+/* The digests and envelope ids wrap rather than scroll. They are the part a
+   sceptic is meant to copy out and compare, and a value cut off at the edge of
+   a card cannot be compared. */
+.apply-receipt code,
+.mail-body code {
+  overflow-wrap: anywhere;
+}
+
+.a2a-decision.is-accepted {
+  color: var(--muted);
+}
+
+.mail-body {
+  margin: 0.5rem 0 0;
+  display: grid;
+  gap: 0.35rem 1rem;
+}
+.mail-body > div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0.2rem 1rem;
+}
+.mail-body dt {
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.mail-body dd {
+  margin: 0;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .apply-row { grid-template-columns: minmax(0, 1fr); }
+  .mail-body > div { grid-template-columns: minmax(0, 1fr); }
 }

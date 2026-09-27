@@ -1,7 +1,6 @@
 -- users — accounts for BOTH sides of the handshake (applicant and employer).
 --
--- Ported from the VT Hacks schema (workspace.vthacks_2026.users, Delta) to
--- Cloud SQL Postgres. Differences, all deliberate:
+-- Cloud SQL Postgres. Choices worth knowing:
 --   * user_id is the Firebase Auth uid, not an app-minted UUID.
 --   * No password_hash: Firebase Auth holds the credentials, so storing a copy
 --     here would only be a second thing to leak.

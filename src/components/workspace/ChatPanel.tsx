@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The right-hand chat drawer (the VT Hacks transcript panel).
+ * The right-hand chat drawer.
  *
  * Collapses to a single square button at the right edge; open, the same button
  * sits in the panel's top-right corner, so the two states are one control. On
