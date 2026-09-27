@@ -3,6 +3,7 @@
  * the Gemini client, the step log the loading page reads, and event publishing.
  */
 import { Connector } from '@google-cloud/cloud-sql-connector';
+import { jsonrepair } from 'jsonrepair';
 import { PubSub } from '@google-cloud/pubsub';
 import { GoogleGenAI } from '@google/genai';
 import pg from 'pg';
@@ -105,19 +106,27 @@ export function parseJsonObject(text) {
   try {
     return JSON.parse(candidate);
   } catch (first) {
-    // Only on failure, and only two repairs: a trailing comma before a closing
-    // brace or bracket, and a // line comment. Both are things a model emits
-    // despite responseMimeType: 'application/json', and neither is valid JSON.
-    // The regexes are not string-aware, which is why they never touch a reply
-    // that parsed on the first attempt.
-    const repaired = candidate.replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1');
+    // responseMimeType: 'application/json' is not a guarantee. The failure that
+    // sent us here was a DROPPED CLOSING BRACE between two array elements:
+    //
+    //   "gpa": null
+    // ,
+    // {  "school": "San Jose State University",
+    //
+    // That is not a trailing comma or a stray fence, it is a structurally
+    // unclosed object, and repairing it by regex means guessing where the brace
+    // belongs. jsonrepair walks the text as a parser and closes what is open,
+    // which is the difference between a fix and a coin flip.
+    //
+    // It runs only after JSON.parse has already failed, so a well-formed reply
+    // is never rewritten.
     try {
-      return JSON.parse(repaired);
+      return JSON.parse(jsonrepair(candidate));
     } catch {
-      // Re-throwing the ORIGINAL error with the text around the failure. A bare
-      // "Expected double-quoted property name at position 439" says nothing
-      // about what the model actually wrote, and the reply is not logged
-      // anywhere else, so the next failure would be as blind as this one.
+      // The ORIGINAL error, plus the text around it. The reply is logged
+      // nowhere else, so "position 439" alone described a defect in a string
+      // no one could read — which is how the dropped brace stayed invisible
+      // through two deploys.
       const at = Number(String(first.message).match(/position (\d+)/)?.[1] ?? 0);
       const from = Math.max(0, at - 160);
       throw new Error(
