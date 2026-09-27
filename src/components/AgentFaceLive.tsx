@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 
 import { AgentFace, type FaceMood } from './AgentFace';
+import type { NoseShape } from './AgentFace3D';
 
 /**
  * agentHire's face, everywhere it appears.
@@ -30,16 +31,19 @@ export function AgentFaceLive({
   size = 260,
   muted = false,
   nose = false,
+  noseShape,
   onNose,
 }: {
   mood?: FaceMood;
   size?: number;
   muted?: boolean;
-  /** Draw the speaker-cone nose, live session or not. */
+  /** Draw the nose, live session or not. */
   nose?: boolean;
+  /** 'mic' draws a microphone instead of the speaker cone (the floating agent only). */
+  noseShape?: NoseShape;
   /** Passing this gives the face a nose that mutes the speaker when clicked.
    *  Only the voice widget does; the greeter and the rail stay noseless. */
   onNose?: () => void;
 }) {
-  return <AgentFace3D mood={mood} size={size} muted={muted} nose={nose} onNose={onNose} />;
+  return <AgentFace3D mood={mood} size={size} muted={muted} nose={nose} noseShape={noseShape} onNose={onNose} />;
 }
