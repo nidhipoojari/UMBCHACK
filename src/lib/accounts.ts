@@ -1,12 +1,14 @@
 import 'server-only';
 
 import { db } from '@/lib/db';
-import type { ApplicantProfile, EmployerProfile, Role, UserRow } from '@/lib/users';
+import type { ApplicantProfile, EmployerProfile, IntakeState, Role, UserRow } from '@/lib/users';
 import type { FirebaseClaims } from '@/lib/verify-token';
 
 export type Account = {
   user: UserRow;
   profile: ApplicantProfile | EmployerProfile | null;
+  /** Latest resume upload, for applicants; null for employers or no upload yet. */
+  intake: IntakeState;
 };
 
 /**
@@ -38,6 +40,7 @@ export async function recordSignIn(claims: FirebaseClaims, role: Role | null): P
     const user = rows[0];
 
     let profile: Account['profile'] = null;
+    let intake: IntakeState = null;
     if (user.role === 'applicant') {
       await client.query(
         `INSERT INTO applicant_profiles (user_id, full_name, email)
@@ -49,6 +52,15 @@ export async function recordSignIn(claims: FirebaseClaims, role: Role | null): P
           user.user_id,
         ])
       ).rows[0];
+      intake =
+        (
+          await client.query<NonNullable<IntakeState>>(
+            `SELECT document_id, status FROM intake_documents
+             WHERE user_id = $1 AND kind = 'resume_pdf'
+             ORDER BY uploaded_at DESC LIMIT 1`,
+            [user.user_id],
+          )
+        ).rows[0] ?? null;
     } else if (user.role === 'employer') {
       await client.query(
         `INSERT INTO employer_profiles (user_id, contact_name, contact_email)
@@ -63,7 +75,7 @@ export async function recordSignIn(claims: FirebaseClaims, role: Role | null): P
     }
 
     await client.query('COMMIT');
-    return { user, profile };
+    return { user, profile, intake };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

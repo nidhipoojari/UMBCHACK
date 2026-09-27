@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google-cloud/cloud-sql-connector": "^1.10.0",
     "@react-three/fiber": "^9.8.1",
     "animejs": "^4.5.0",
     "firebase": "^12.19.0",

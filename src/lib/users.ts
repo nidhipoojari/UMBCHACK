@@ -40,9 +40,22 @@ export type EmployerProfile = {
   updated_at: string;
 };
 
-/** Where each side lands after signing in. No role yet means sign-up is unfinished. */
-export function destinationFor(role: Role | null): string {
-  if (role === 'applicant') return '/applicant';
+/** The applicant's latest resume upload, as far as onboarding is concerned. */
+export type IntakeState = {
+  document_id: string;
+  status: 'received' | 'parsing' | 'parsed' | 'failed';
+} | null;
+
+/**
+ * Where someone belongs after signing in. No role yet means sign-up is
+ * unfinished. Applicants go through resume onboarding before their dashboard:
+ * no resume (or a failed one) goes to the upload page, one still being read
+ * goes to its progress page.
+ */
+export function destinationFor(role: Role | null, intake: IntakeState = null): string {
   if (role === 'employer') return '/employer';
-  return '/signup?error=pick-role';
+  if (role !== 'applicant') return '/signup?error=pick-role';
+  if (!intake || intake.status === 'failed') return '/applicant/intake/resume';
+  if (intake.status !== 'parsed') return `/applicant/intake/progress?doc=${intake.document_id}`;
+  return '/applicant';
 }

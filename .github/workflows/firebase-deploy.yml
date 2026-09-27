@@ -18,6 +18,29 @@ permissions:
 env:
   FIREBASE_PROJECT: project-96b6d773-106a-457a-a46
 
+  # The Firebase web config, the same values as .env.example. It is public by
+  # design — it names the project, it authorizes nothing; access is enforced by
+  # Firebase Auth itself — which is why it sits here in plain sight rather than
+  # in a secret.
+  #
+  # It has to be present at BUILD time, not just at run time: NEXT_PUBLIC_* is
+  # inlined into the bundle by next build, and src/lib/firebase.ts calls
+  # getAuth() at module scope. Without these, prerendering / evaluates that
+  # module with apiKey: undefined and the build dies on auth/invalid-api-key.
+  NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyDahF4NfGaibY8r8TFchHls7-XGJ5FvP8Y
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: project-96b6d773-106a-457a-a46.firebaseapp.com
+  NEXT_PUBLIC_FIREBASE_PROJECT_ID: project-96b6d773-106a-457a-a46
+  NEXT_PUBLIC_FIREBASE_APP_ID: "1:349500970232:web:65ca0b1ba5cc4c1b3bd70d"
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "349500970232"
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: project-96b6d773-106a-457a-a46.firebasestorage.app
+  # Resumes go to their own bucket, not the project default. Missing here,
+  # it inlined as undefined and the browser uploaded to /v0/b/undefined/o —
+  # which fails as a CORS error, because a preflight to a bucket that does
+  # not exist cannot return CORS headers. Every NEXT_PUBLIC_* in
+  # .env.example has to be mirrored here or it silently becomes undefined
+  # in the bundle.
+  NEXT_PUBLIC_FIREBASE_UPLOADS_BUCKET: agenthire-uploads-349500970232
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -30,6 +53,35 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # Turbopack resolves an externalised CJS package through an alias package
+      # it writes to .next/node_modules — for pg, "pg-587764f78a6c7a9c". That
+      # directory matches the node_modules exclusion when the backend is
+      # packaged, so it never reaches the function and every /api/* route died
+      # with ERR_MODULE_NOT_FOUND on a name that exists only at build time.
+      # webpack emits an ordinary require instead, resolved from the
+      # node_modules the buildpack installs.
+      #
+      # It is a shim rather than a flag in the build script because
+      # firebase-tools spawns node_modules/.bin/next with a bare "build" and
+      # only WARNS that a custom build script exists — it never runs it. Its
+      # build is the one that produces the deployed bundle, so the flag has to
+      # be attached to the binary it actually calls.
+      - name: Build with webpack, not Turbopack
+        run: |
+          cd node_modules/.bin
+          mv next next-real
+          cat > next <<'SH'
+          #!/usr/bin/env bash
+          args=("$@")
+          if [ "${args[0]}" = "build" ]; then args+=(--webpack); fi
+          exec "$(dirname "$0")/next-real" "${args[@]}"
+          SH
+          chmod +x next
+
+      # firebase deploy builds the app again itself (hosting.source points at
+      # this directory). This step is kept anyway so a broken build fails in
+      # forty seconds, with next's own error, before the job touches GCP.
       - run: npm run build
 
       - id: auth
@@ -37,6 +89,27 @@ jobs:
         with:
           workload_identity_provider: projects/349500970232/locations/global/workloadIdentityPools/github/providers/github
           service_account: github-actions-deploy@project-96b6d773-106a-457a-a46.iam.gserviceaccount.com
+
+      # Framework-aware Hosting is still behind an opt-in flag. Without this the
+      # deploy steps read hosting.source as a config error rather than as
+      # "build this Next.js app and put its server somewhere".
+      - name: Enable framework-aware hosting
+        run: npx --yes firebase-tools@15 experiments:enable webframeworks
+
+      # Without this, both deploy steps below exit 1 AFTER succeeding.
+      # firebase-tools wants an Artifact Registry cleanup policy so the SSR
+      # container images do not accumulate and bill; it cannot ask under
+      # --non-interactive, and it reports not being able to ask as an error
+      # rather than skipping it. Setting the policy answers the question
+      # instead of suppressing it.
+      #
+      # A step of its own because hosting:channel:deploy accepts no flag that
+      # would answer the prompt inline, so the preview path could not do this
+      # for itself even in principle. Re-running it is a no-op.
+      - name: Ensure an image cleanup policy exists
+        run: |
+          npx --yes firebase-tools@15 functions:artifacts:setpolicy \
+            --project "$FIREBASE_PROJECT" --location us-east1 --days 3 --force
 
       # Pull requests get a throwaway preview URL that expires in 7 days.
       - name: Deploy preview
