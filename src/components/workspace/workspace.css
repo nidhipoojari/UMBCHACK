@@ -1,0 +1,553 @@
+/* ===========================================================================
+   WORKSPACE — the side nav, the chat drawer, and the placeholder pages.
+
+   Ported from VT Hacks (globals.css side nav, account.css, voice.css) onto
+   agentHire's tokens: white paper, ink, rounded cards, ink hairlines. The
+   page-width variables (--nav-w, --drawer-w) and the body padding that makes
+   room for both panels live in globals.css.
+   =========================================================================== */
+
+/* --- Side nav: a rail that widens, not a drawer that vanishes ------------- */
+
+.sidenav {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 60;
+  width: var(--nav-w);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0 18px;
+  background: var(--paper);
+  border-right: 1px solid var(--line);
+  /* Clips the labels mid-collapse instead of letting them spill over the page. */
+  overflow: hidden;
+  transition: width 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The one control that survives the collapse, pinned to the same x in both states. */
+.sidenav__toggle {
+  flex: none;
+  align-self: flex-start;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  transition: color 0.2s ease;
+}
+.sidenav__toggle:hover { color: var(--ink); }
+
+.sidenav__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 248px;
+  padding: 10px 14px 0;
+  overflow-y: auto;
+}
+/* An explicit display beats the browser's `hidden`, so opt back out. */
+.sidenav__body[hidden] { display: none; }
+
+.sidenav__brand {
+  display: block;
+  padding: 0 12px 22px;
+  color: var(--ink);
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.sidenav__label {
+  margin: 0 0 10px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sidenav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+
+.sidenav ul a {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 17px;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+.sidenav ul a:hover { color: var(--ink); background: var(--wash); }
+
+/* Marked by fill and weight of colour, not colour alone; aria-current says it too. */
+.sidenav ul a[aria-current='page'] { color: var(--ink); background: var(--card-hover); }
+
+.sidenav__foot {
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 900px) {
+  .sidenav.is-open {
+    width: min(280px, calc(100vw - 48px));
+    box-shadow: 18px 0 40px color-mix(in srgb, var(--ink) 14%, transparent);
+  }
+}
+
+/* --- Account link, at the nav's foot ------------------------------------- */
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color 0.16s ease;
+}
+.account:hover { background: var(--wash); }
+
+.account__avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, var(--paper));
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* min-width: 0 lets the ellipsis happen inside a flex child. */
+.account__who { min-width: 0; display: grid; }
+.account__who strong {
+  font-weight: 400;
+  font-size: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account__role { font-size: 13px; color: var(--muted); text-transform: capitalize; }
+
+.account__caret { margin-left: auto; flex: none; color: var(--muted); transition: transform 0.16s ease; }
+.account:hover .account__caret { transform: translateX(2px); }
+
+/* --- Chat drawer ---------------------------------------------------------- */
+
+.vt-dock {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: stretch;
+  pointer-events: none;
+}
+/* Not display:none when closed: the toggle is still a child of the dock. */
+.vt-dock > * { pointer-events: auto; }
+
+/* One button in one place: the collapsed tab while shut, the panel's top-right
+   corner while open. It never unmounts, so there is always a way back. */
+.vt-tab {
+  position: fixed;
+  top: 16px;
+  right: 14px;
+  z-index: 70;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.vt-tab:hover { border-color: var(--ink); background: var(--wash); }
+
+/* Unread count while shut, so closing it does not hide that the chat moved on. */
+.vt-tab-count {
+  position: absolute;
+  top: -7px;
+  left: -7px;
+  min-width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.vt-panel {
+  width: min(420px, 100vw);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  border-left: 1px solid var(--line);
+  box-shadow: -18px 0 40px color-mix(in srgb, var(--ink) 8%, transparent);
+  overflow: hidden;
+  animation: vt-slide-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Room for the toggle, so the heading never runs underneath it. */
+.vt-panel-head { padding: 22px 70px 14px 20px; border-bottom: 1px solid var(--line); }
+.vt-panel-head h2 { margin: 0; font-size: 20px; }
+
+.vt-page {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.vt-page strong { color: var(--ink); font-weight: 400; }
+
+.vt-proactive {
+  margin: 12px 16px 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.vt-proactive p { margin: 0 0 10px; font-size: 15px; line-height: 1.45; }
+.vt-proactive-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.vt-mini {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14px;
+}
+.vt-mini-quiet { background: transparent; color: var(--muted); border-color: var(--line-strong); }
+
+.vt-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  margin: 0;
+  padding: 16px 20px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vt-entry { font-size: 15.5px; line-height: 1.5; }
+
+.vt-who {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vt-said {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 9px 13px;
+  border-radius: 14px;
+  overflow-wrap: anywhere;
+}
+.vt-agent .vt-said { background: var(--card); border: 1px solid var(--line); border-top-left-radius: 4px; }
+.vt-user { align-self: flex-end; text-align: right; max-width: 88%; }
+.vt-user .vt-said { margin-left: auto; background: var(--ink); color: var(--paper); border-top-right-radius: 4px; text-align: left; }
+.vt-typing .vt-said { color: var(--muted); }
+
+/* An action is the loudest line: the only one that says something changed. */
+.vt-action {
+  padding: 10px 13px;
+  border-left: 3px solid var(--ink);
+  border-radius: 0 14px 14px 0;
+  background: var(--wash);
+}
+.vt-action.is-pending, .vt-action.is-failed { border-left-style: dashed; }
+.vt-action-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+}
+.vt-action-text { display: block; }
+
+.vt-note {
+  margin: 0;
+  padding: 9px 20px;
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+.vt-reply {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 14px;
+}
+.vt-reply input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  /* 16px keeps iOS Safari from zooming the page when the field is focused. */
+  font-size: 16px;
+  padding: 10px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+}
+.vt-send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+}
+.vt-send:disabled { background: var(--line-strong); cursor: not-allowed; }
+
+@keyframes vt-slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* --- Backdrops: only on narrow windows, where the panels overlay the page -- */
+
+.ws-backdrop { display: none; }
+
+@media (max-width: 900px) {
+  .ws-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    padding: 0;
+    border: 0;
+    background: color-mix(in srgb, var(--ink) 22%, transparent);
+    cursor: default;
+  }
+}
+
+@media (max-width: 480px) {
+  .vt-tab { top: 12px; right: 10px; }
+  .vt-panel-head { padding-top: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidenav, .account, .account__caret { transition: none; }
+  .vt-panel { animation: none; }
+}
+
+/* ===========================================================================
+   PLACEHOLDER PAGES
+   =========================================================================== */
+
+.ws-main {
+  max-width: 1120px;
+  margin: 0 auto;
+  /* Top room clears the chat toggle in the top-right corner. */
+  padding: 40px var(--gutter) 96px;
+}
+/* Beats globals.css's `html[data-sidenav] main { padding-top }`. */
+html[data-sidenav] main.ws-main { padding-top: 40px; }
+
+.ws-head { padding: 12px 0 28px; max-width: 64ch; }
+.ws-head h1 { font-size: clamp(32px, 4.6vw, 48px); line-height: 1.06; margin: 10px 0 12px; }
+.ws-head p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.6; }
+
+/* Says, on every page, that the numbers are not real yet. */
+.ws-sample {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 4px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.ws-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+.ws-stats li {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+.ws-stats span { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.ws-stats strong { font-size: 38px; line-height: 1; font-weight: 400; }
+
+.ws-section { padding-top: 36px; container-type: inline-size; }
+.ws-section > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.ws-section > header h2 { font-size: 24px; }
+.ws-section > header a { color: var(--muted); font-size: 16px; }
+
+.ws-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 0 48px; }
+
+/* Rows: title and meta on the left, a status pill and a trailing figure. */
+.ws-list { list-style: none; margin: 0; padding: 0; }
+.ws-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 6px 18px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.ws-row h3 { margin: 0 0 4px; font-size: 18px; font-weight: 400; }
+.ws-row p { margin: 0; color: var(--muted); font-size: 15.5px; }
+.ws-row > strong { font-size: 22px; font-weight: 400; min-width: 3ch; text-align: right; }
+
+.ws-pill {
+  display: inline-block;
+  padding: 3px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+.ws-pill--solid { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+
+.ws-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.ws-tags li { padding: 2px 10px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 13.5px; }
+
+/* Pipeline board: columns side by side, scrolling sideways when they do not fit. */
+.ws-board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(230px, 1fr);
+  gap: 14px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  scroll-snap-type: x mandatory;
+}
+.ws-column {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--line);
+  scroll-snap-align: start;
+}
+.ws-column h2 { display: flex; justify-content: space-between; font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ws-column h2 span { color: var(--muted); }
+.ws-card {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+.ws-card h3 { margin: 0 0 4px; font-size: 16.5px; font-weight: 400; }
+.ws-card p { margin: 0; color: var(--muted); font-size: 14.5px; }
+
+/* Timeline for activity. */
+.ws-timeline { list-style: none; margin: 0; padding: 0; }
+.ws-timeline li {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 4px 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.ws-timeline time { color: var(--muted); font-size: 15px; padding-top: 2px; }
+.ws-timeline h3 { margin: 0 0 4px; font-size: 17.5px; font-weight: 400; }
+.ws-timeline p { margin: 0; color: var(--muted); font-size: 15.5px; }
+
+/* Stacks when its column is narrow (the chat drawer open, or the overview's
+   side column), not only when the window is. */
+@container (max-width: 520px) {
+  .ws-timeline li { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .ws-facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
+
+/* Definition lists for profile and account. */
+.ws-facts { margin: 0; }
+.ws-facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 200px) minmax(0, 1fr);
+  gap: 18px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.ws-facts dt { font-size: 13.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); padding-top: 3px; }
+.ws-facts dd { margin: 0; font-size: 18px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.ws-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 1px solid var(--ink);
+  border-radius: var(--control-radius);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 16px;
+  text-decoration: none;
+}
+.ws-button--quiet { background: transparent; color: var(--ink); border-color: var(--line-strong); }
+.ws-actions { display: flex; flex-wrap: wrap; gap: 10px; padding-top: 24px; }
+
+@media (max-width: 900px) {
+  html[data-sidenav] main.ws-main { padding-top: 76px; }
+  .ws-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .ws-main { padding-left: 18px; padding-right: 18px; }
+  .ws-head p:not(.eyebrow) { font-size: 16.5px; }
+  .ws-stats { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .ws-stats li { padding: 14px 16px; }
+  .ws-stats strong { font-size: 30px; }
+  .ws-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .ws-row > .ws-pill { grid-column: 1; grid-row: 2; justify-self: start; }
+  .ws-row > strong { grid-column: 2; grid-row: 1 / 3; }
+  .ws-timeline li, .ws-facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .ws-board { grid-auto-columns: minmax(78%, 1fr); }
+}

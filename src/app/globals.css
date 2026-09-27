@@ -57,6 +57,13 @@ html[data-transcript='open'] { --drawer-w: min(420px, calc(100vw - 72px)); }
 html[data-sidenav='open'] { --nav-w: 248px; }
 html[data-sidenav='closed'] { --nav-w: 56px; }
 
+/* Narrow windows cannot give up 248px to the nav or 420px to the chat, so both
+   overlay the page instead of pushing it: the page keeps only the nav's rail. */
+@media (max-width: 900px) {
+  html[data-sidenav='open'] { --nav-w: 56px; }
+  html[data-transcript='open'] { --drawer-w: 0px; }
+}
+
 /* The top bar is gone, so nothing else is holding the first block off the top. */
 html[data-sidenav] main { padding-top: 34px; }
 
@@ -1079,124 +1086,6 @@ footer svg { width: 18px; height: 18px; stroke-width: 1.5; color: var(--muted); 
 
   .handshake-actions {
     flex-wrap: wrap;
-  }
-}
-
-/* ===========================================================================
-   WORKSPACE SIDE NAV — a left drawer, mirroring the transcript on the right
-   =========================================================================== */
-
-/* --- The side nav: a rail that widens, not a drawer that vanishes --------- */
-/* No .topbar any more. It existed only to hold the toggle, so when the header
-   went the toggle moved in here — which means this element can never be hidden,
-   or the control that reopens it would be inside the thing it hides. */
-
-.sidenav {
-  position: fixed;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 60;
-  width: var(--nav-w);
-  display: flex;
-  flex-direction: column;
-  padding: 16px 0 22px;
-  background: var(--paper);
-  border-right: 1px solid var(--line);
-  /* Clips the labels mid-collapse instead of letting them spill over the page. */
-  overflow: hidden;
-  transition: width 0.42s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* The one control that survives the collapse. Centred in the rail so it does not
-   jump sideways as the nav widens. */
-.sidenav__toggle {
-  flex: none;
-  /* Pinned to the left edge so it stays on the same x in both states. Left to
-     stretch, it re-centres itself as the nav widens and the icon slides. */
-  align-self: flex-start;
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 48px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  transition: color 0.2s ease, background 0.2s ease;
-}
-.sidenav__toggle:hover {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
-}
-
-.sidenav__body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 248px;
-  padding: 12px 18px 0;
-  overflow-y: auto;
-}
-
-/* `hidden` sets display:none only at the browser-default level, so the
-   display:flex above beat it and the labels stayed on screen, clipped to the rail
-   width with their text poking out. Anything that sets an explicit display must
-   opt back out. */
-.sidenav__body[hidden] { display: none; }
-
-@media (prefers-reduced-motion: reduce) {
-  .sidenav { transition: none; }
-}
-
-.sidenav__label {
-  margin: 0 0 14px;
-  padding: 0 10px;
-  font-size: 13px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.sidenav ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
-
-.sidenav a {
-  display: block;
-  padding: 11px 10px;
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 17px;
-  border-left: 2px solid transparent;
-  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease;
-}
-.sidenav a:hover {
-  color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-}
-
-/* The current page is marked by weight of colour and a rule, not by colour
-   alone — aria-current already says it, this just makes it visible. */
-.sidenav a[aria-current='page'] {
-  color: var(--ink);
-  border-left-color: var(--ink);
-  background: color-mix(in srgb, var(--ink) 5%, transparent);
-}
-
-.sidenav__foot {
-  margin-top: auto;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-}
-.sidenav__foot button { width: 100%; text-align: left; padding: 11px 10px; }
-
-/* Narrow windows cannot afford to give up 248px, so an OPEN nav overlays instead
-   of pushing: the page still gives up the rail, and the expanded panel sits on
-   top of its own content. */
-@media (max-width: 900px) {
-  html[data-sidenav='open'] { --nav-w: 56px; }
-  .sidenav.is-open {
-    width: 248px;
-    box-shadow: 18px 0 40px color-mix(in srgb, var(--ink) 12%, transparent);
   }
 }
 
