@@ -50,6 +50,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
 
   const [draft, setDraftState] = useState('');
   const [answers, setAnswers] = useState<InterviewAnswer[]>([]);
+  const answersRef = useRef<InterviewAnswer[]>([]);
   const [critiques, setCritiques] = useState<AnswerCritique[]>([]);
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
 
@@ -73,6 +74,13 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
   /** Whether the current draft came, at least partly, from speech. */
   const spokeRef = useRef(false);
   const scheduledAtRef = useRef(0);
+  const finishRef = useRef<(allAnswers: InterviewAnswer[]) => Promise<void>>(async () => {});
+  const endRequestedRef = useRef<() => void>(() => {});
+  const voiceEndHandledRef = useRef(false);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   const scheduleAutoSend = useCallback(() => {
     if (!draftRef.current.trim()) return;
@@ -95,7 +103,12 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
     },
     [scheduleAutoSend, setDraft],
   );
-  const liveCall = useLiveInterviewer(jobId, session?.sessionId ?? '', { onHeard, onNotice: setNotice });
+  const onEndRequested = useCallback(() => endRequestedRef.current(), []);
+  const liveCall = useLiveInterviewer(jobId, session?.sessionId ?? '', {
+    onHeard,
+    onEndRequested,
+    onNotice: setNotice,
+  });
   const liveOn = liveCall.status === 'live' || liveCall.status === 'connecting';
 
   const preparedRef = useRef<InterviewSessionPayload | null | undefined>(undefined);
@@ -412,6 +425,25 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
     [jobId, session, stopCamera],
   );
 
+  useEffect(() => {
+    finishRef.current = finish;
+  }, [finish]);
+
+  useEffect(() => {
+    endRequestedRef.current = () => {
+      if (voiceEndHandledRef.current) return;
+      voiceEndHandledRef.current = true;
+      // The stop request is a command, not an answer. Cancel its pending
+      // transcript and save only answers completed before the tool call.
+      setAutoSendAt(null);
+      setDraft('');
+      spokeRef.current = false;
+      spokenSecondsRef.current = null;
+      setNotice('Ending the interview and writing your readout.');
+      void finishRef.current(answersRef.current);
+    };
+  }, [setDraft]);
+
   const send = useCallback(
     async (skip: boolean) => {
       if (!session || !question) return;
@@ -466,6 +498,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
           return;
         }
         const allAnswers = [...answers, answer];
+        answersRef.current = allAnswers;
         setAnswers(allAnswers);
         setCritiques((previous) => [...previous, payload.critique as AnswerCritique]);
         setDraft('');
@@ -524,6 +557,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
 
   const startInterview = useCallback(() => {
     if (!session) return;
+    voiceEndHandledRef.current = false;
     setPhase('live');
     // Started from the click, so the browser lets the call open the microphone and play audio.
     if (session.liveReady) void liveCall.start(0);

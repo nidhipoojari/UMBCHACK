@@ -44,11 +44,17 @@ type Handlers = {
    * Gemini decides they have stopped talking: the end of their answer.
    */
   onHeard: (text: string, finished: boolean) => void;
+  /** Gemini called the explicit end_interview tool after a clear spoken request. */
+  onEndRequested: () => void;
   /** A status sentence for the room's live region. */
   onNotice: (text: string | null) => void;
 };
 
-export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, onNotice }: Handlers) {
+export function useLiveInterviewer(
+  jobId: string,
+  sessionId: string,
+  { onHeard, onEndRequested, onNotice }: Handlers,
+) {
   const [status, setStatus] = useState<LiveStatus>('idle');
   const [speaking, setSpeaking] = useState(false);
 
@@ -82,10 +88,10 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
     firstVoice: null,
     lastVoice: null,
   });
-  const handlers = useRef({ onHeard, onNotice });
+  const handlers = useRef({ onHeard, onEndRequested, onNotice });
   useEffect(() => {
-    handlers.current = { onHeard, onNotice };
-  }, [onHeard, onNotice]);
+    handlers.current = { onHeard, onEndRequested, onNotice };
+  }, [onEndRequested, onHeard, onNotice]);
 
   const silence = useCallback(() => {
     const state = live.current;
@@ -220,6 +226,8 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
             handlers.current.onNotice('The interviewer is on the line. Answer out loud; your words appear in the answer box.');
           } else if (message.type === 'heard') {
             handlers.current.onHeard(message.text ?? '', !!message.finished);
+          } else if (message.type === 'end_requested') {
+            handlers.current.onEndRequested();
           } else if (message.type === 'interrupted') {
             silence();
           } else if (message.type === 'error' && message.message) {
