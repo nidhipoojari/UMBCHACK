@@ -12,9 +12,11 @@ export const metadata = { title: 'Network · agentHire' };
 export default function NetworkPage() {
   return (
     <main id="main" className="ws-main">
+      {/* One line instead of three. The old blurb described what the rows
+          below already show — months to first job, route in, a reply — and a
+          student reads the rows first anyway. */}
       <PageHead eyebrow="Network" title="Alumni who already did this." sample={false}>
-        Graduates from your major and track who landed a first role — how long it took them, and
-        how they got in. Reach out and their agent answers with their own numbers.
+        Reach out. Their agent answers with its own numbers.
       </PageHead>
       <AlumniNetwork />
     </main>
