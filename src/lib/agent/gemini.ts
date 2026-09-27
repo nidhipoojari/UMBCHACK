@@ -112,9 +112,13 @@ export async function generate(
       systemInstruction: { parts: [{ text: system }] },
       contents,
       tools: tools.length ? [{ functionDeclarations: tools }] : undefined,
-      // Low thinking: these are short, tool-grounded answers, and a spoken reply
-      // that starts two seconds sooner matters more than deeper reasoning.
-      generationConfig: { temperature: 0.2, maxOutputTokens: 1024, thinkingConfig: { thinkingLevel: 'low' } },
+      // thinkingConfig is deliberately absent. It is a Gemini 3 parameter and
+      // the model this calls rejects the whole request with
+      // "thinking_level is not supported by this model" -- a 400 that the
+      // browser sees as a 502 and that looks like an outage rather than one
+      // unsupported field. It only ever bought a slightly faster first token,
+      // which is not worth a request that cannot be sent at all.
+      generationConfig: { temperature: 0.2, maxOutputTokens: 1024 },
     }),
   });
 
