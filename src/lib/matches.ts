@@ -16,12 +16,18 @@ export type JobMatch = {
   title_hit: boolean | null;
   eligibility: 'pass' | 'unknown' | null;
   eligibility_reason: string | null;
+  /** The model's one-line reason this role fits. */
+  reason: string | null;
 };
 
 export type MatchesResponse = {
   /** null when there is no parsed resume, or it predates matching. */
   status: 'pending' | 'ok' | 'failed' | null;
+  /** Postings searched: every US posting from the last 30 days. */
   poolSize: number | null;
+  /** The level inferred from the resume, and the years it came from. */
+  level: 'early' | 'mid' | 'senior' | 'staff' | null;
+  experienceYears: number | null;
   matchedAt: string | null;
   matches: JobMatch[];
 };

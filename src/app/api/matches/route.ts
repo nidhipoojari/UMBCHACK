@@ -21,20 +21,31 @@ export async function GET(request: Request) {
     document_id: string;
     status: MatchesResponse['status'];
     pool_size: number | null;
+    level: MatchesResponse['level'];
+    experience_years: number | null;
     finished_at: string | null;
   }>(
-    `SELECT l.document_id, r.status, r.pool_size, r.finished_at
+    `SELECT l.document_id, r.status, r.pool_size, r.level, r.experience_years::float AS experience_years, r.finished_at
      FROM latest_resume l LEFT JOIN job_match_runs r USING (document_id)
      WHERE l.user_id = $1`,
     [uid],
   );
   const current = run.rows[0];
-  if (!current) return Response.json({ status: null, poolSize: null, matchedAt: null, matches: [] } satisfies MatchesResponse);
+  if (!current) {
+    return Response.json({
+      status: null,
+      poolSize: null,
+      level: null,
+      experienceYears: null,
+      matchedAt: null,
+      matches: [],
+    } satisfies MatchesResponse);
+  }
 
   const matches = await db.query<JobMatch>(
     `SELECT job_id, rank, score::float AS score, title, company, location, url, posted_at,
             skills_required, skills_matched, skills_missing, skill_coverage::float AS skill_coverage,
-            title_hit, eligibility, eligibility_reason
+            title_hit, eligibility, eligibility_reason, reason
      FROM job_matches WHERE document_id = $1 ORDER BY rank`,
     [current.document_id],
   );
@@ -42,6 +53,8 @@ export async function GET(request: Request) {
   return Response.json({
     status: current.status ?? null,
     poolSize: current.pool_size,
+    level: current.level,
+    experienceYears: current.experience_years,
     matchedAt: current.finished_at,
     matches: matches.rows,
   } satisfies MatchesResponse);

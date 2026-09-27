@@ -15,6 +15,20 @@ import { useMatches } from './useMatches';
 
 const fit = (m: JobMatch) => `${Math.round(m.score * 100)}`;
 
+const LEVEL_NAMES: Record<NonNullable<MatchesResponse['level']>, string> = {
+  early: 'early-career',
+  mid: 'mid-level',
+  senior: 'senior',
+  staff: 'staff and principal',
+};
+
+/** What the matcher assumed, so a wrong guess is visible rather than silent. */
+function basis(data: MatchesResponse): string | null {
+  if (!data.level) return null;
+  const years = data.experienceYears ?? 0;
+  return `Matched for ${LEVEL_NAMES[data.level]} roles: your resume shows about ${years} ${years === 1 ? 'year' : 'years'} of full-time work.`;
+}
+
 function posted(at: string | null): string | null {
   if (!at) return null;
   const days = Math.floor((Date.now() - new Date(at).getTime()) / 86_400_000);
@@ -56,6 +70,7 @@ function MatchRow({ match, detailed }: { match: JobMatch; detailed: boolean }) {
           )}
         </h3>
         <p>{meta}</p>
+        {match.reason ? <p className="ws-match__why">{match.reason}</p> : null}
         {detailed && match.skills_matched.length ? (
           <ul className="ws-tags" aria-label="Skills you have">
             {match.skills_matched.slice(0, 6).map((skill) => (
@@ -64,7 +79,7 @@ function MatchRow({ match, detailed }: { match: JobMatch; detailed: boolean }) {
           </ul>
         ) : null}
         {detailed && match.skills_missing.length ? (
-          <p className="ws-match__gap">To brush up on: {match.skills_missing.slice(0, 5).join(', ')}</p>
+          <p className="ws-match__gap">Missing: {match.skills_missing.slice(0, 5).join(', ')}</p>
         ) : null}
       </div>
       {match.eligibility === 'pass' ? (
@@ -95,10 +110,11 @@ export function MatchList() {
         {data?.matches.length ? (
           <span className="muted">
             {data.matches.length} roles
-            {data.poolSize ? ` from ${data.poolSize.toLocaleString()} recent postings` : ''}
+            {data.poolSize ? `, picked from ${data.poolSize.toLocaleString()} US postings in the last 30 days` : ''}
           </span>
         ) : null}
       </header>
+      {data && basis(data) ? <p className="ws-match__basis">{basis(data)}</p> : null}
       {empty ?? (
         <ul className="ws-list">
           {data!.matches.map((match) => (

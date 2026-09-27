@@ -1,8 +1,9 @@
--- Job matches: the roles the job-matcher service found for each resume version.
+-- Job matches: the open roles that fit each resume version.
 --
 -- Written by the match-jobs Cloud Function, which runs on the resume.parsed
--- event alongside the enrichers, builds a match profile from that version's
--- rows, calls job-matcher (Cloud Run, IAM-only) and saves what it returns.
+-- event alongside the enrichers: a full-text search of job_snapshots on the
+-- applicant's skills and titles, filtered to their inferred level, then a
+-- Gemini rerank that scores fit and names the skills they have and lack.
 -- Kept per version like every other profile table: a new resume gets its own
 -- matches, and "current" is the latest parsed document.
 --
@@ -49,3 +50,11 @@ CREATE TABLE IF NOT EXISTS job_matches (
   PRIMARY KEY (document_id, job_id)
 );
 CREATE INDEX IF NOT EXISTS job_matches_doc_rank_idx ON job_matches (document_id, rank);
+
+-- How each run matched, and the level it inferred from the resume.
+ALTER TABLE job_match_runs ADD COLUMN IF NOT EXISTS method TEXT;              -- search+gemini
+ALTER TABLE job_match_runs ADD COLUMN IF NOT EXISTS experience_years NUMERIC(4,1);
+ALTER TABLE job_match_runs ADD COLUMN IF NOT EXISTS level TEXT;               -- early | mid | senior | staff
+
+-- The model's one-line reason this role fits.
+ALTER TABLE job_matches ADD COLUMN IF NOT EXISTS reason TEXT;

@@ -7,7 +7,7 @@ export default function JobsPage() {
   return (
     <main id="main" className="ws-main">
       <PageHead eyebrow="Jobs" title="Roles that fit you." sample={false}>
-        Matched against your resume&rsquo;s skills and past titles, with the gaps named. Fit is out of 100.
+        Every recent US posting, searched on your skills and past titles, then read against your resume. Fit is out of 100.
       </PageHead>
       <MatchList />
     </main>

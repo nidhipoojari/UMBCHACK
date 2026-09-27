@@ -6,8 +6,8 @@
 #   enrich-github     Eventarc: Pub/Sub topic resume-parsed
 #   enrich-linkedin   Eventarc: Pub/Sub topic resume-parsed
 #   enrich-portfolio  Eventarc: Pub/Sub topic resume-parsed
-#   match-jobs        Eventarc: Pub/Sub topic resume-parsed; calls job-matcher
-#                     (Cloud Run, us-east1, IAM-only) and publishes jobs.matched
+#   match-jobs        Eventarc: Pub/Sub topic resume-parsed; searches job_snapshots,
+#                     reranks with Gemini, and publishes jobs.matched
 #
 # The enrichers publish profile.enriched to the profile-enriched topic, for
 # anything downstream (matching, notifications) to subscribe to.
@@ -21,8 +21,7 @@ PROJECT=project-96b6d773-106a-457a-a46
 REGION=us-east4
 BUCKET=agenthire-uploads-349500970232
 SA=resume-extractor@${PROJECT}.iam.gserviceaccount.com
-MATCHER_URL=https://job-matcher-nsw4gvibpq-ue.a.run.app
-ENV="PROJECT_ID=$PROJECT,INSTANCE_CONNECTION_NAME=$PROJECT:$REGION:agenthire-db,DB_USER=agenthire_app,DB_NAME=agenthire,GEMINI_MODEL=gemini-flash-latest,GEMINI_LOCATION=global,MATCHER_URL=$MATCHER_URL"
+ENV="PROJECT_ID=$PROJECT,INSTANCE_CONNECTION_NAME=$PROJECT:$REGION:agenthire-db,DB_USER=agenthire_app,DB_NAME=agenthire,GEMINI_MODEL=gemini-flash-latest,GEMINI_LOCATION=global"
 
 deploy() { # name entry-point trigger-flags...
   local name=$1 entry=$2
@@ -51,8 +50,7 @@ if want enrich-github; then deploy enrich-github enrichGithub --trigger-topic=re
 if want enrich-linkedin; then deploy enrich-linkedin enrichLinkedin --trigger-topic=resume-parsed; fi
 if want enrich-portfolio; then deploy enrich-portfolio enrichPortfolio --trigger-topic=resume-parsed; fi
 if want match-jobs; then
-  # The function calls job-matcher with its own identity, and announces results.
-  gcloud run services add-iam-policy-binding job-matcher --project="$PROJECT" --region=us-east1     --member="serviceAccount:$SA" --role=roles/run.invoker --quiet >/dev/null
+  # The function announces its results on jobs-matched.
   gcloud pubsub topics describe jobs-matched --project="$PROJECT" >/dev/null 2>&1 ||
     gcloud pubsub topics create jobs-matched --project="$PROJECT"
   gcloud pubsub topics add-iam-policy-binding jobs-matched --project="$PROJECT"     --member="serviceAccount:$SA" --role=roles/pubsub.publisher --quiet >/dev/null

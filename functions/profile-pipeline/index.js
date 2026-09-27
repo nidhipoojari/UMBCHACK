@@ -6,7 +6,8 @@
  *     └─ extract-resume ── publishes resume.parsed ──┬─ enrich-github    ─┐
  *                                                     ├─ enrich-linkedin  ─┼─ each publishes profile.enriched
  *                                                     ├─ enrich-portfolio ─┘
- *                                                     └─ match-jobs ── calls job-matcher, publishes jobs.matched
+ *                                                     └─ match-jobs ── searches job_snapshots, Gemini rerank,
+ *                                                                      publishes jobs.matched
  *
  * Every step writes to intake_events, which the onboarding loading page polls.
  * See deploy.sh for triggers and settings.
