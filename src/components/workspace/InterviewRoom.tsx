@@ -18,6 +18,7 @@ import {
 
 import { PixelWave, useLiveInterviewer } from './LiveInterviewer';
 import './interview.css';
+import { toJobSlug } from '@/lib/job-slug';
 
 type Phase = 'brief' | 'live' | 'done';
 
@@ -532,7 +533,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
 
   const back = (
     <p className="iv-back">
-      <Link href={`/applicant/jobs/${encodeURIComponent(jobId)}`}>
+      <Link href={`/applicant/jobs/${toJobSlug(jobId)}`}>
         <ArrowLeft size={16} aria-hidden="true" /> Back to the role
       </Link>
     </p>
