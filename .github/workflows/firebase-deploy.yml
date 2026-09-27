@@ -64,16 +64,22 @@ jobs:
       - name: Enable framework-aware hosting
         run: npx --yes firebase-tools@15 experiments:enable webframeworks
 
+      # --force is what keeps these steps from exiting 1 after a SUCCESSFUL
+      # deploy. firebase-tools wants to attach an Artifact Registry cleanup
+      # policy so old SSR container images do not accumulate and bill, it
+      # cannot ask under --non-interactive, and it treats not asking as an
+      # error rather than as a skip. --force answers the question in advance.
+
       # Pull requests get a throwaway preview URL that expires in 7 days.
       - name: Deploy preview
         if: github.event_name == 'pull_request'
         run: |
           npx --yes firebase-tools@15 hosting:channel:deploy "pr-${{ github.event.number }}" \
-            --project "$FIREBASE_PROJECT" --expires 7d --non-interactive
+            --project "$FIREBASE_PROJECT" --expires 7d --non-interactive --force
 
       # Pushes to main go straight to the live site.
       - name: Deploy live
         if: github.event_name != 'pull_request'
         run: |
           npx --yes firebase-tools@15 deploy --only hosting \
-            --project "$FIREBASE_PROJECT" --non-interactive
+            --project "$FIREBASE_PROJECT" --non-interactive --force
