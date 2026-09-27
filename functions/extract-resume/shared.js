@@ -100,5 +100,29 @@ export function parseJsonObject(text) {
   const start = body.indexOf('{');
   const end = body.lastIndexOf('}');
   if (start === -1 || end <= start) throw new Error('The model reply had no JSON object.');
-  return JSON.parse(body.slice(start, end + 1));
+  const candidate = body.slice(start, end + 1);
+
+  try {
+    return JSON.parse(candidate);
+  } catch (first) {
+    // Only on failure, and only two repairs: a trailing comma before a closing
+    // brace or bracket, and a // line comment. Both are things a model emits
+    // despite responseMimeType: 'application/json', and neither is valid JSON.
+    // The regexes are not string-aware, which is why they never touch a reply
+    // that parsed on the first attempt.
+    const repaired = candidate.replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1');
+    try {
+      return JSON.parse(repaired);
+    } catch {
+      // Re-throwing the ORIGINAL error with the text around the failure. A bare
+      // "Expected double-quoted property name at position 439" says nothing
+      // about what the model actually wrote, and the reply is not logged
+      // anywhere else, so the next failure would be as blind as this one.
+      const at = Number(String(first.message).match(/position (\d+)/)?.[1] ?? 0);
+      const from = Math.max(0, at - 160);
+      throw new Error(
+        `${first.message} | reply[${from}..${at + 160}]: ${JSON.stringify(candidate.slice(from, at + 160))}`,
+      );
+    }
+  }
 }
