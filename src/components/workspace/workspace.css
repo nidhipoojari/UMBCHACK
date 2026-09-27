@@ -1082,6 +1082,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
    into a workspace section and lay out the transcript and the typed answers.
    =========================================================================== */
 
+.ws-section.gi { padding-bottom: 32px; }
 .gi__greeter { margin: 4px auto 0; }
 /* Nothing to do on a tap while it is thinking: say so with the cursor, not a dim face. */
 .gi__greeter .greeter__face:disabled { cursor: default; }
