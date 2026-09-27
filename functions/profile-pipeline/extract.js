@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import { Storage } from '@google-cloud/storage';
 
 import { SOURCES } from './enrich.js';
+import { MATCH_STEP } from './match.js';
 import { INSTRUCTIONS, classifyLinks, detectGaps, profileSchema } from './profile.js';
 import { MODEL, getGenAI, getPool, parseJsonObject, plural, publish, stepLog } from './shared.js';
 
@@ -165,6 +166,11 @@ export async function extractResume(cloudEvent) {
       );
       await log.start(source.id, source.ordinal, source.waiting);
     }
+    await db.query(
+      `INSERT INTO job_match_runs (document_id, user_id, status) VALUES ($1, $2, 'pending') ON CONFLICT DO NOTHING`,
+      [documentId, userId],
+    );
+    await log.start(MATCH_STEP.id, MATCH_STEP.ordinal, MATCH_STEP.waiting);
     await publish('resume-parsed', 'resume.parsed', {
       documentId,
       userId,
@@ -177,7 +183,7 @@ export async function extractResume(cloudEvent) {
         .filter(Boolean)
         .slice(0, 3),
     });
-    await settle('handoff', 'ok', 'Looking beyond your resume', 'Checking GitHub, LinkedIn and your website at the same time.');
+    await settle('handoff', 'ok', 'Looking beyond your resume', 'Checking GitHub, LinkedIn and your website, and matching you to open roles.');
   } catch (error) {
     console.error(`Extraction failed for ${documentId}:`, error);
     const message = error.userFacing ? error.message : 'Something went wrong on our side. Try uploading it again.';

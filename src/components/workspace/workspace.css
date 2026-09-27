@@ -551,3 +551,395 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .ws-timeline li, .ws-facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .ws-board { grid-auto-columns: minmax(78%, 1fr); }
 }
+
+/* ---- Alumni network -------------------------------------------------------
+   The rank bar, the route cards and the agent list. Colours come from the
+   workspace tokens above rather than new ones: this screen is a view of the
+   same workspace, and a second palette would read as a different product. */
+
+/* One bar, two screens. The agents page needs exactly this component, and a
+   second implementation under another name would be a second thing to keep in
+   step with the reduced-motion rule at the foot of this block. */
+.alumni-bar,
+.a2a-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  overflow: hidden;
+  margin: 0.75rem 0 0.4rem;
+}
+.alumni-bar > span,
+.a2a-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  /* Width is driven by XP, so it should read as progress being made rather
+     than as a value snapping into place. */
+  transition: width 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.alumni-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.86rem;
+  margin: 0.5rem 0 0;
+}
+
+.alumni-sub {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.alumni-routes {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+.alumni-routes li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  border: 1px dashed color-mix(in srgb, currentColor 22%, transparent);
+  /* Undiscovered routes are deliberately quiet: the point is that there is
+     something there to find, not that the student is missing out. */
+  opacity: 0.55;
+}
+.alumni-routes li.is-unlocked {
+  opacity: 1;
+  border-style: solid;
+  border-color: color-mix(in srgb, currentColor 38%, transparent);
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+
+.alumni-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.alumni-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+.alumni-filters select {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  background: transparent;
+  color: inherit;
+}
+
+.alumni-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.alumni-list li {
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+  display: grid;
+  gap: 0.5rem;
+}
+.alumni-list li.is-connected {
+  border-color: color-mix(in srgb, currentColor 32%, transparent);
+  background: color-mix(in srgb, currentColor 4%, transparent);
+}
+
+.alumni-id {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.alumni-id strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92rem;
+}
+
+.alumni-advice {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.alumni-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.alumni-connect {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+  border: 0;
+  font: inherit;
+}
+.alumni-connect[disabled] {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.spin {
+  animation: alumni-spin 900ms linear infinite;
+}
+@keyframes alumni-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Respect a stated preference for less motion: the spinner and the bar are
+   feedback, and neither needs to move to say what it says. */
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+  .alumni-bar > span,
+  .a2a-bar > span {
+    transition: none;
+  }
+}
+/* --- Job matches ---------------------------------------------------------- */
+
+.ws-match h3 a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.ws-match h3 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ws-match h3 a svg { flex: none; align-self: center; color: var(--muted); }
+.ws-match__gap { margin-top: 8px !important; font-size: 14.5px !important; }
+.ws-match__why { margin-top: 6px !important; color: var(--ink) !important; font-size: 15.5px !important; line-height: 1.5; }
+.ws-match__basis { margin: 14px 0 0; color: var(--muted); font-size: 15px; }
+
+/* --- Agent menu -------------------------------------------------------------
+   The registry, the check board and the audit trail.
+
+   NO NEW COLOURS. The palette is one ink on paper, and --failure is already
+   defined as var(--ink) on purpose — so a refusal cannot be made to stand out
+   by turning it red, and should not be: red is unreadable to some of the people
+   this page is for, and a trail whose meaning lives in a hue is a trail nobody
+   can quote. Emphasis here is fill, border weight and a solid rule, the same
+   grammar .vt-action already uses for "this line is the one that matters". */
+
+.a2a-hint {
+  font-size: 0.86rem;
+  line-height: 1.55;
+  margin: 0.6rem 0 0;
+  max-width: 76ch;
+}
+.a2a-hint code { font-size: 0.82rem; }
+
+.a2a-stats { margin-top: 1.1rem; }
+
+.a2a-sub {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 1.5rem 0 0.6rem;
+  font-weight: 400;
+}
+
+/* Mono for anything an operator would paste into a query: agent names, key
+   fingerprints, envelope ids, payload hashes. `anywhere` rather than
+   break-word because a 43-character fingerprint has no break opportunity at
+   all and would otherwise push the card wider than a phone. */
+.a2a-name,
+.a2a-key code,
+.a2a-meta code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+.a2a-name { font-size: 0.9rem; }
+
+/* --- The check board ------------------------------------------------------ */
+
+.a2a-defences {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+.a2a-defences li {
+  display: grid;
+  gap: 0.35rem;
+  align-content: start;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  /* Dashed and quiet until it has actually refused something: the card is a
+     claim about the code, and a solid border would read as evidence. */
+  border: 1px dashed var(--line-strong);
+  opacity: 0.6;
+}
+.a2a-defences li.is-fired {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--line-strong);
+  background: var(--card);
+}
+
+.a2a-defence-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.a2a-defence-head strong { font-weight: 400; font-size: 1.02rem; }
+
+.a2a-defence-blurb { margin: 0; font-size: 0.88rem; line-height: 1.5; color: var(--muted); }
+
+/* The verbatim refusal. Quoted rather than paraphrased, because the whole
+   claim of this screen is that the reason is legible and checkable. */
+.a2a-quote {
+  margin: 0.25rem 0 0;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--line-strong);
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.a2a-quote q { font-style: italic; }
+
+/* --- The roster ----------------------------------------------------------- */
+
+.a2a-agents {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.a2a-agent {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+.a2a-agent.is-self { border-color: var(--line-strong); background: var(--card-hover); }
+/* A caller with no key on file gets the dashed edge the whole page uses for
+   "asserted, not proven". */
+.a2a-agent.is-unknown { border-style: dashed; border-color: var(--line-strong); background: transparent; }
+
+.a2a-agent-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.a2a-key,
+.a2a-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.a2a-key svg { align-self: center; flex: none; color: var(--muted); }
+
+.a2a-key-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.a2a-note { margin: 0.35rem 0 0; font-size: 0.84rem; line-height: 1.55; max-width: 72ch; }
+
+/* --- The trail ------------------------------------------------------------ */
+
+.a2a-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 1rem 0;
+}
+.a2a-filter { cursor: pointer; font: inherit; font-size: 13.5px; }
+/* aria-pressed carries the state for a screen reader; the fill carries it for
+   everyone else. Both, because neither alone is the whole audience. */
+.a2a-filter[aria-pressed='true'] { font-weight: 500; }
+
+.a2a-feed {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+}
+.a2a-feed li {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+/* The refused row is the loudest thing on the page. It is not an error state:
+   it is the evidence, so it gets the solid rule and the fill. */
+.a2a-feed li.is-refused {
+  border-left: 3px solid var(--ink);
+  border-radius: 0 12px 12px 0;
+  background: var(--wash);
+}
+
+.a2a-feed-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.a2a-decision {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.a2a-decision.is-refused { color: var(--ink); font-weight: 500; }
+
+.a2a-reasons {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.a2a-reasons-none { margin: 0; font-size: 0.86rem; }
+
+@media (max-width: 640px) {
+  .a2a-defences { grid-template-columns: minmax(0, 1fr); }
+  .a2a-feed li.is-refused { border-left-width: 3px; }
+  .a2a-name { font-size: 0.82rem; }
+}

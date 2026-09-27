@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Deploys the profile pipeline: four Cloud Functions (2nd gen) from this one
+# Deploys the profile pipeline: five Cloud Functions (2nd gen) from this one
 # package, wired by events.
 #
 #   extract-resume    Eventarc: GCS object finalized in the uploads bucket
 #   enrich-github     Eventarc: Pub/Sub topic resume-parsed
 #   enrich-linkedin   Eventarc: Pub/Sub topic resume-parsed
 #   enrich-portfolio  Eventarc: Pub/Sub topic resume-parsed
+#   match-jobs        Eventarc: Pub/Sub topic resume-parsed; searches job_snapshots,
+#                     reranks with Gemini, and publishes jobs.matched
 #
 # The enrichers publish profile.enriched to the profile-enriched topic, for
 # anything downstream (matching, notifications) to subscribe to.
 #
-# Usage: ./deploy.sh            deploy all four
+# Usage: ./deploy.sh            deploy all five
 #        ./deploy.sh extract-resume enrich-github   deploy some
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -47,3 +49,10 @@ fi
 if want enrich-github; then deploy enrich-github enrichGithub --trigger-topic=resume-parsed; fi
 if want enrich-linkedin; then deploy enrich-linkedin enrichLinkedin --trigger-topic=resume-parsed; fi
 if want enrich-portfolio; then deploy enrich-portfolio enrichPortfolio --trigger-topic=resume-parsed; fi
+if want match-jobs; then
+  # The function announces its results on jobs-matched.
+  gcloud pubsub topics describe jobs-matched --project="$PROJECT" >/dev/null 2>&1 ||
+    gcloud pubsub topics create jobs-matched --project="$PROJECT"
+  gcloud pubsub topics add-iam-policy-binding jobs-matched --project="$PROJECT"     --member="serviceAccount:$SA" --role=roles/pubsub.publisher --quiet >/dev/null
+  deploy match-jobs matchJobs --trigger-topic=resume-parsed
+fi
