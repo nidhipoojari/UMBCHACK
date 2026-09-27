@@ -36,15 +36,53 @@ export class GeminiError extends Error {
 }
 
 function config() {
-  const key = process.env.GEMINI_API_KEY;
   const project = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-  if (!key || !project) throw new GeminiError('Gemini is not configured.', 500);
+  if (!project) throw new GeminiError('Gemini is not configured.', 500);
   return {
-    key,
     project,
-    model: process.env.GEMINI_MODEL ?? 'gemini-3.8-flash',
+    model: process.env.GEMINI_MODEL ?? 'gemini-flash-latest',
     location: process.env.GEMINI_LOCATION ?? 'global',
   };
+}
+
+/**
+ * A Vertex access token from the runtime service account.
+ *
+ * WHY NOT THE API KEY THIS USED TO SEND. The key was a Vertex Express key,
+ * which bills against prepaid AI Studio credit rather than the project. That
+ * credit ran out, and every turn came back
+ * "Your prepayment credits are depleted" as a 402 -- which the browser saw as
+ * a 502 and which no amount of configuration could fix, because nothing was
+ * misconfigured. The service account already holds roles/aiplatform.user and
+ * the project already has billing, which is the same path the rest of the app
+ * uses for Gemini. One billing relationship instead of two.
+ *
+ * The metadata server rather than a library: this needs no dependency, and on
+ * Cloud Run it is always there. Locally there is no metadata server, so the
+ * caller falls back to GEMINI_API_KEY if one is set.
+ */
+let cachedToken: { value: string; expires: number } | null = null;
+
+async function accessToken(): Promise<string | null> {
+  if (cachedToken && Date.now() < cachedToken.expires) return cachedToken.value;
+  try {
+    const res = await fetch(
+      'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token',
+      { headers: { 'Metadata-Flavor': 'Google' }, signal: AbortSignal.timeout(3000) },
+    );
+    if (!res.ok) return null;
+    const body = (await res.json()) as { access_token?: string; expires_in?: number };
+    if (!body.access_token) return null;
+    // Refreshed a minute early so a turn never starts on a token that expires
+    // mid-flight.
+    cachedToken = {
+      value: body.access_token,
+      expires: Date.now() + Math.max(0, (body.expires_in ?? 3600) - 60) * 1000,
+    };
+    return cachedToken.value;
+  } catch {
+    return null;
+  }
 }
 
 /** One model turn. Returns the model's content exactly as sent, because Gemini 3
@@ -54,14 +92,22 @@ export async function generate(
   contents: Content[],
   tools: FunctionDeclaration[],
 ): Promise<Content> {
-  const { key, project, model, location } = config();
+  const { project, model, location } = config();
+  const token = await accessToken();
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!token && !apiKey) throw new GeminiError('Gemini is not configured.', 500);
   const url =
     `https://aiplatform.googleapis.com/v1/projects/${project}/locations/${location}` +
     `/publishers/google/models/${model}:generateContent`;
 
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    // Bearer when the metadata server answered (Cloud Run), API key otherwise
+    // (a laptop). Never both: sending a key alongside a token is how a request
+    // ends up billed to the path you were trying to leave.
+    headers: token
+      ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+      : { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey as string },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents,
