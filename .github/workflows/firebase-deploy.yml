@@ -33,6 +33,13 @@ env:
   NEXT_PUBLIC_FIREBASE_APP_ID: "1:349500970232:web:65ca0b1ba5cc4c1b3bd70d"
   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "349500970232"
   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: project-96b6d773-106a-457a-a46.firebasestorage.app
+  # Resumes go to their own bucket, not the project default. Missing here,
+  # it inlined as undefined and the browser uploaded to /v0/b/undefined/o —
+  # which fails as a CORS error, because a preflight to a bucket that does
+  # not exist cannot return CORS headers. Every NEXT_PUBLIC_* in
+  # .env.example has to be mirrored here or it silently becomes undefined
+  # in the bundle.
+  NEXT_PUBLIC_FIREBASE_UPLOADS_BUCKET: agenthire-uploads-349500970232
 
 jobs:
   deploy:
