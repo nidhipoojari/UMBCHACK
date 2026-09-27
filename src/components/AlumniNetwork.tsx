@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { Award, Check, Loader2, Radio, Send, Shield } from 'lucide-react';
+import { Check, Loader2, Radio, Send, Shield, Zap } from 'lucide-react';
 
+import { GameHud } from '@/components/game/GameHud';
+import { useGame } from '@/components/game/useGame';
+import type { ConnectOutcome } from '@/lib/game-contract';
 import { firebaseAuth } from '@/lib/firebase';
 
 /**
@@ -21,6 +24,17 @@ import { firebaseAuth } from '@/lib/firebase';
  * `first_job_found_via` among the people a student has reached is a real way
  * into work — a return offer, a career fair, a referral — and collecting them
  * is collecting knowledge of how this cohort actually got hired.
+ *
+ * THE RANK BLOCK MOVED OUT, AND MOST OF ITS WORDS DID NOT COME WITH IT. What
+ * used to be a bar plus two sentences explaining the scoring is now GameHud:
+ * an energy meter that empties, a streak that reacts, XP that counts. The
+ * sentences are gone because a meter says the same thing in less time, and
+ * because the rule they described ("the same person twice is worth nothing")
+ * is now demonstrated — a second attempt moves no pip and no counter.
+ *
+ * ENERGY GATES THE BUTTON. That is the mechanic, not a decoration: a day holds
+ * a fixed number of approaches, so when it is spent the control says so and
+ * says when it comes back, rather than failing on the server after a click.
  */
 
 type Agent = {
@@ -38,6 +52,7 @@ type Agent = {
   monthsToFirstJob: number | null;
   foundVia: string | null;
   internships: number | null;
+  headline: string;
   advice: string;
   connected: boolean;
 };
@@ -88,6 +103,11 @@ export function AlumniNetwork() {
   const [replies, setReplies] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
+  // The game layer is its own feed rather than another field on `data`,
+  // because it outlives a cohort change: switching major refetches the alumni
+  // list, and energy spent before the switch must not come back with it.
+  const feed = useGame(authedFetch);
+
   const load = useCallback(async () => {
     setError(null);
     const query = new URLSearchParams({ major });
@@ -127,14 +147,23 @@ export function AlumniNetwork() {
         method: 'POST',
         body: JSON.stringify({ campusId: agent.campusId, question: null }),
       });
+      // The route is being taught to return a ConnectOutcome in another
+      // worktree. Until it does it answers with the older shape, so the
+      // outcome is passed through as `unknown` and useGame decides: a real
+      // ConnectOutcome is used verbatim, anything else falls back to replaying
+      // the contract's constants locally so the meters still have a delta to
+      // animate. Widening the type here rather than editing the contract kept
+      // the two implementations from disagreeing about field names.
       const result = (await response.json()) as
-        | { ok: true; alreadyConnected: boolean; reply: string; progress: Progress }
+        | ({ ok: true; alreadyConnected: boolean; reply: string; progress: Progress } & Partial<ConnectOutcome>)
         | { ok: false; error: string };
 
       if (!result.ok) {
         setError(result.error);
         return;
       }
+
+      feed.applyOutcome((result as unknown as ConnectOutcome) ?? null, result.alreadyConnected);
       setReplies((prev) => ({ ...prev, [agent.campusId]: result.reply }));
       setData((prev) =>
         prev
@@ -163,44 +192,46 @@ export function AlumniNetwork() {
 
   const { agents, stats, progress, options } = data;
   const tracks = options.find((o) => o.major === major)?.tracks ?? [];
-  const pct = Math.round((progress.xpIntoLevel / progress.xpForNextLevel) * 100);
+
+  // A route is learned once, not once per cohort. Rendering unlocks against
+  // only the selected cohort's routes meant switching major hid what the
+  // student had already discovered — it read as having earned nothing. The
+  // cohort's routes still lead, because those are the ones worth chasing here;
+  // anything discovered elsewhere is appended rather than dropped.
+  const extra = progress.routesUnlocked
+    .filter((route) => !stats.routes.some((r) => r.route === route))
+    .map((route) => ({ route, count: 0, share: 0 }));
+  const allRoutes = [...stats.routes, ...extra];
+  const outOfEnergy = feed.game.energy.remaining <= 0;
 
   return (
     <>
       <section className="ws-section" aria-labelledby="rank-h">
         <header>
-          <h2 id="rank-h">
-            <Award size={16} aria-hidden="true" /> {progress.levelTitle}
-          </h2>
-          <span className="muted">
-            {progress.connections} reached · {progress.xp} XP
-          </span>
+          <h2 id="rank-h">{progress.levelTitle}</h2>
+          <span className="muted">{progress.connections} reached</span>
         </header>
 
-        <div
-          className="alumni-bar"
-          role="progressbar"
-          aria-valuenow={progress.xpIntoLevel}
-          aria-valuemin={0}
-          aria-valuemax={progress.xpForNextLevel}
-          aria-label={`${progress.xpForNextLevel - progress.xpIntoLevel} XP to the next rank`}
-        >
-          <span style={{ width: `${pct}%` }} />
-        </div>
-        <p className="muted alumni-hint">
-          {progress.xpForNextLevel - progress.xpIntoLevel} XP to the next rank. Each new person is
-          worth 10 — reaching the same person twice is worth nothing, and is recorded as a refusal.
-        </p>
+        <GameHud game={feed.game} outcome={feed.outcome} live={feed.live} />
 
-        <h3 className="alumni-sub">Routes discovered</h3>
+        <h3 className="alumni-sub">
+          Routes — {progress.routesUnlocked.length} of {allRoutes.length}
+        </h3>
         <ul className="alumni-routes">
-          {stats.routes.map((r) => {
+          {allRoutes.map((r) => {
             const unlocked = progress.routesUnlocked.includes(r.route);
             return (
               <li key={r.route} className={unlocked ? 'is-unlocked' : ''}>
                 <strong>{unlocked ? r.route : '???'}</strong>
+                {/* Three words at most. "not yet discovered" and "discovered
+                    in another cohort" were both saying, at length, what the
+                    dashed border already says. */}
                 <span className="muted">
-                  {unlocked ? `${Math.round(r.share * 100)}% of this cohort` : 'not yet discovered'}
+                  {!unlocked
+                    ? 'locked'
+                    : r.count === 0
+                      ? 'other cohort'
+                      : `${Math.round(r.share * 100)}% of cohort`}
                 </span>
               </li>
             );
@@ -284,21 +315,42 @@ export function AlumniNetwork() {
                 </span>
               </div>
 
-              <p className="alumni-advice">{replies[agent.campusId] ?? agent.advice}</p>
+              <p className="alumni-headline">
+                {agent.headline}
+                {agent.industry ? <span className="muted"> · {agent.industry}</span> : null}
+              </p>
+
+              {/* The reply, and only the reply. Printing the cohort-aware
+                  paragraph on every card repeated the same median on all of
+                  them and buried the one line that differs. It arrives when
+                  the alumnus actually answers. */}
+              {replies[agent.campusId] ? (
+                <p className="alumni-advice">{replies[agent.campusId]}</p>
+              ) : null}
 
               <div className="alumni-actions">
+                {agent.foundVia ? (
+                  <span className="ws-pill ws-pill--route">{agent.foundVia}</span>
+                ) : null}
                 {agent.monthsToFirstJob !== null ? (
                   <span className="ws-pill">
                     {agent.monthsToFirstJob < 0.1 ? 'straight in' : `${agent.monthsToFirstJob.toFixed(1)} mo`}
                   </span>
                 ) : null}
+                {agent.internships ? (
+                  <span className="ws-pill">{agent.internships} internship{agent.internships === 1 ? '' : 's'}</span>
+                ) : null}
                 {agent.region ? <span className="ws-pill">{agent.region}</span> : null}
                 {agent.remote ? <span className="ws-pill">Remote</span> : null}
 
+                {/* Disabled on empty energy, with the reason in the label
+                    rather than in a sentence under the list. A control that
+                    looks live and then fails is worse than one that says what
+                    it is waiting for. */}
                 <button
                   type="button"
                   className="ws-pill ws-pill--solid alumni-connect"
-                  disabled={agent.connected || busy === agent.campusId}
+                  disabled={agent.connected || busy === agent.campusId || outOfEnergy}
                   onClick={() => connect(agent)}
                 >
                   {agent.connected ? (
@@ -308,6 +360,10 @@ export function AlumniNetwork() {
                   ) : busy === agent.campusId ? (
                     <>
                       <Loader2 size={13} className="spin" aria-hidden="true" /> Sending
+                    </>
+                  ) : outOfEnergy ? (
+                    <>
+                      <Zap size={13} aria-hidden="true" /> No energy
                     </>
                   ) : (
                     <>
@@ -320,10 +376,12 @@ export function AlumniNetwork() {
           ))}
         </ul>
 
+        {/* Kept, but cut to one line. The claim that every approach is signed
+            and logged is worth making; the inventory of which columns it lands
+            in belongs on the Agents screen, which already prints the trail. */}
         <p className="muted alumni-hint">
           <Shield size={13} aria-hidden="true" /> Every approach is signed into{' '}
-          <code>a2a_audit</code> in Cloud SQL — the envelope id, the decision and a SHA-256 of the
-          message. The message body itself is never stored.
+          <code>a2a_audit</code>, body never stored.
         </p>
       </section>
     </>

@@ -13,9 +13,10 @@ export const metadata = { title: 'Agents · agentHire' };
 export default function AgentsPage() {
   return (
     <main id="main" className="ws-main">
+      {/* Trimmed to the claim. The enumeration that followed it was a list of
+          the sections underneath, which the reader is about to scroll past. */}
       <PageHead eyebrow="Agents" title="Who your agent will speak to." sample={false}>
-        Every agent this deployment has a key for, every caller that turned up without one, and
-        what the gateway decided about each envelope — refusals included, with their reasons.
+        Every key, every caller without one, every decision — refusals included.
       </PageHead>
       <AgentMenu />
     </main>

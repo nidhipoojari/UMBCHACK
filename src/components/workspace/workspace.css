@@ -557,10 +557,11 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
    workspace tokens above rather than new ones: this screen is a view of the
    same workspace, and a second palette would read as a different product. */
 
-/* One bar, two screens. The agents page needs exactly this component, and a
-   second implementation under another name would be a second thing to keep in
-   step with the reduced-motion rule at the foot of this block. */
-.alumni-bar,
+/* Now the agents page only. The alumni screen's copy of this bar went with the
+   rank block it belonged to — its replacement lives in game.css, which the
+   component carries itself so it is styled outside WorkspaceShell too. Left as
+   one selector rather than renamed, so a merge with the other worktrees touches
+   as few lines here as possible. */
 .a2a-bar {
   height: 8px;
   border-radius: 999px;
@@ -568,7 +569,6 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   overflow: hidden;
   margin: 0.75rem 0 0.4rem;
 }
-.alumni-bar > span,
 .a2a-bar > span {
   display: block;
   height: 100%;
@@ -713,7 +713,6 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .spin {
     animation: none;
   }
-  .alumni-bar > span,
   .a2a-bar > span {
     transition: none;
   }
@@ -942,4 +941,52 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   .a2a-defences { grid-template-columns: minmax(0, 1fr); }
   .a2a-feed li.is-refused { border-left-width: 3px; }
   .a2a-name { font-size: 0.82rem; }
+}
+
+/* Agent cards: the headline is a name and two marks; everything dense sits
+   behind the disclosure so the roster can be scanned rather than read. */
+.a2a-title {
+  font-size: 0.98rem;
+}
+.a2a-domain {
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
+.a2a-details > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  opacity: 0.6;
+  margin-top: 6px;
+  list-style: none;
+}
+.a2a-details > summary::-webkit-details-marker {
+  display: none;
+}
+.a2a-details > summary::before {
+  content: '▸ ';
+}
+.a2a-details[open] > summary::before {
+  content: '▾ ';
+}
+.a2a-details > summary:hover {
+  opacity: 1;
+}
+.a2a-details[open] {
+  margin-top: 2px;
+}
+
+.alumni-headline {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.alumni-headline .muted {
+  font-weight: 400;
+}
+/* The route is the single most useful fact on a card — it is the thing the
+   student is here to learn — so it leads the pill row and is the only one
+   tinted. */
+.ws-pill--route {
+  background: color-mix(in srgb, currentColor 9%, transparent);
+  font-weight: 600;
 }

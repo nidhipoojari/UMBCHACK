@@ -1,0 +1,545 @@
+/* ===========================================================================
+   GAME LAYER — energy, streak, XP, level, achievements.
+
+   WHY THIS FILE EXISTS AT ALL rather than more rules in workspace.css:
+   workspace.css is imported by WorkspaceShell, so anything styled there is
+   unstyled everywhere else — which is how a badge once shipped as a bare
+   <button> outside the shell. VerifiedBadges solved that by carrying
+   verified-badges.css itself; the HUD does the same. It also means the dev
+   harness under /dev renders the real thing rather than an approximation.
+
+   NO NEW PALETTE. Every colour below is var(--ink) on var(--paper), mixed.
+   The app's tokens deliberately define --success, --failure and --accent as
+   the same ink, because meaning that lives in a hue is meaning that some
+   readers do not get. An energy meter is exactly the kind of thing that
+   invites a red/amber/green gradient, and that is exactly why it does not have
+   one: "two left" is carried by two filled pips and the text beside them.
+   =========================================================================== */
+
+.g-hud {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  margin: 0 0 4px;
+}
+
+.g-card {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 16px 18px;
+  border-radius: var(--radius, 18px);
+  border: 1px solid var(--line, color-mix(in srgb, currentColor 9%, transparent));
+  background: var(--card, color-mix(in srgb, currentColor 3%, transparent));
+  /* Contains the level-up sheen and the +XP chip, both of which travel
+     outside the text box they belong to. */
+  overflow: hidden;
+}
+
+.g-card > h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted, color-mix(in srgb, currentColor 60%, transparent));
+}
+
+/* The one figure each card exists to show. Large, because the brief is that
+   the numbers do the talking. */
+.g-figure {
+  /* It is a <p>, so it arrives with a 1em margin — at 38px that is 76px of
+     air inside a card whose own gap is 10px, and it was reading as a layout
+     bug on a phone before it was recognised as the browser default. */
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 38px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.g-figure small {
+  font-size: 15px;
+  color: var(--muted, color-mix(in srgb, currentColor 60%, transparent));
+}
+
+.g-note {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--muted, color-mix(in srgb, currentColor 60%, transparent));
+}
+
+/* Screen-reader-only, defined here rather than borrowed from globals.css so
+   the component is self-sufficient outside the app shell. */
+.g-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Sample marker ---------------------------------------------------------
+   The HUD's own badge, not the page's. The alumni figures on this page ARE
+   real; only the game totals are placeholder while the rules land. Flipping
+   PageHead's `sample` would have labelled 3,200 genuine outcomes as invented,
+   which is the same lie in the other direction. */
+.g-sample {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px dashed var(--line-strong, color-mix(in srgb, currentColor 18%, transparent));
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--muted, color-mix(in srgb, currentColor 60%, transparent));
+}
+
+/* --- Energy ---------------------------------------------------------------
+   Segments, not a bar. A continuous bar at 60% says "quite a lot left"; five
+   pips with two filled says "two more, then you are done today", which is the
+   actual rule. Countable beats proportional when the quantity is small and
+   discrete. */
+.g-pips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.g-pip {
+  position: relative;
+  /* 28px minimum on the short side: these sit next to real controls and the
+     row must not become a 10px sliver on a phone. */
+  min-width: 34px;
+  height: 28px;
+  flex: 1 1 34px;
+  max-width: 64px;
+  border-radius: 8px;
+  border: 1px solid var(--line-strong, color-mix(in srgb, currentColor 18%, transparent));
+  background: transparent;
+  overflow: hidden;
+}
+/* The fill is a child rather than the pip's own background so it can scale
+   from the bottom — a pip that drains reads as a thing being used up, where a
+   pip that fades reads as a thing being disabled. */
+.g-pip > i {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: var(--ink, currentColor);
+  transform-origin: 50% 100%;
+  transform: scaleY(1);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 420ms ease;
+}
+.g-pip.is-spent > i {
+  transform: scaleY(0);
+  opacity: 0;
+}
+/* The pip being spent by THIS click drains last and flashes its outline, so
+   the eye is told which one went. */
+.g-pip.is-spending {
+  animation: g-pip-spend 520ms ease-out;
+}
+@keyframes g-pip-spend {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 0 5px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+/* Empty is a state worth drawing, not just an absence of fills. */
+.g-energy.is-empty .g-pip {
+  border-style: dashed;
+}
+
+/* --- Streak ---------------------------------------------------------------
+   Two meanings, two treatments. A streak that is ALIVE (today is already
+   counted) is solid. A streak at risk — real, but expiring at the next UTC
+   midnight — is drawn with a dashed ring rather than a different colour, and
+   the word "at risk" is printed. `alive` being separate from `current` in the
+   contract is what makes this possible: rendering 0 at 9am would punish
+   someone for not having acted yet. */
+.g-streak-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--ink, currentColor);
+  flex: none;
+}
+.g-streak.is-at-risk .g-streak-mark {
+  border-style: dashed;
+  opacity: 0.7;
+}
+.g-streak-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+/* Fires only when ConnectOutcome.streakExtended is true — never on a refetch
+   that happens to show a larger number. */
+.g-streak.is-extended .g-streak-mark {
+  animation: g-streak-pop 720ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes g-streak-pop {
+  0% {
+    transform: scale(1);
+  }
+  28% {
+    transform: scale(1.22);
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 40%, transparent);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 14px transparent;
+  }
+}
+.g-streak.is-extended .g-flame {
+  animation: g-flicker 720ms ease-in-out;
+}
+@keyframes g-flicker {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  30% {
+    transform: translateY(-2px) scale(1.12);
+  }
+  65% {
+    transform: translateY(1px) scale(0.96);
+  }
+}
+
+/* --- XP and level ---------------------------------------------------------- */
+.g-bar {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  overflow: hidden;
+}
+/* Class-scoped, not `.g-bar > span`. The delta chip is also a child of this
+   element, and the descendant selector caught it too — giving the "+10" the
+   fill's height:100% and clipping it to a 10px sliver of ink that read as part
+   of the bar. Two things in the same box need two names. */
+.g-bar > .g-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--ink, currentColor);
+  transition: width 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* On a level-up the bar has to run to 100% and come back to a small number.
+   Animating straight from 90% to 12% would slide BACKWARDS, which reads as
+   losing progress at the exact moment the student gained some. The component
+   fills to 100%, then swaps this class on to drop instantly and start again. */
+.g-bar.is-reset > .g-fill {
+  transition: none;
+}
+
+/* The award, as a chip that rises out of the bar. It is not the total — the
+   total counts in the figure above — it is the DELTA, which is the thing the
+   contract goes out of its way to give us. */
+/* Holds the track and the chip that rises out of it. */
+.g-track {
+  position: relative;
+}
+
+.g-delta {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  margin-bottom: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ink, currentColor);
+  color: var(--paper, #fff);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  animation: g-delta-rise 1100ms ease-out forwards;
+  pointer-events: none;
+}
+@keyframes g-delta-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(-8px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+}
+
+/* --- Level-up moment -------------------------------------------------------
+   Deliberately interruptive. Levelling is one of the two events the contract
+   singles out as worth stopping for, and a toast in the corner is the opposite
+   of stopping. It is not a modal dialog though: nothing is being asked, and
+   trapping focus to announce good news would be rude to a keyboard user. */
+.g-levelup {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: color-mix(in srgb, var(--ink, #000) 32%, transparent);
+  animation: g-fade 240ms ease-out;
+}
+.g-levelup-card {
+  width: min(380px, 100%);
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+  text-align: center;
+  padding: 28px 26px 22px;
+  border-radius: var(--radius, 18px);
+  border: 1px solid var(--line-strong, color-mix(in srgb, currentColor 18%, transparent));
+  background: var(--paper, #fff);
+  box-shadow: 0 30px 70px -28px rgba(0, 0, 0, 0.6);
+  animation: g-levelup-in 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.g-levelup-card .g-eyebrow {
+  margin: 0;
+  font-size: 12.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted, color-mix(in srgb, currentColor 60%, transparent));
+}
+.g-levelup-card h2 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.1;
+  font-weight: 400;
+}
+.g-levelup-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 2px solid var(--ink, currentColor);
+  font-size: 28px;
+  font-variant-numeric: tabular-nums;
+}
+.g-levelup-card button {
+  font: inherit;
+  padding: 9px 22px;
+  min-height: 34px;
+  border: 0;
+  border-radius: var(--control-radius, 999px);
+  background: var(--ink, #000);
+  color: var(--paper, #fff);
+  cursor: pointer;
+}
+@keyframes g-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes g-levelup-in {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+/* One sweep across the card. Enough to mark the moment; a loop would turn a
+   moment into a decoration. */
+.g-levelup-ring::after {
+  content: '';
+  position: absolute;
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: 2px solid var(--ink, currentColor);
+  animation: g-ripple 900ms ease-out 120ms forwards;
+}
+@keyframes g-ripple {
+  from {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+/* --- Achievements ---------------------------------------------------------
+   Every one is drawn, locked or not, with its progress bar filled to where the
+   student actually is. An achievement that only appears at the moment it is
+   won gives nobody anything to aim at, which is the opposite of the point —
+   `progress`/`target` are in the contract for this. */
+.g-ach-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 18px 0 10px;
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted, color-mix(in srgb, currentColor 60%, transparent));
+}
+
+.g-ach {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.g-ach li {
+  display: grid;
+  gap: 7px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px dashed var(--line-strong, color-mix(in srgb, currentColor 18%, transparent));
+  /* Quiet rather than hidden: there is something there to find. */
+  opacity: 0.62;
+  transition: opacity 320ms ease, border-color 320ms ease, background 320ms ease;
+}
+.g-ach li.is-earned {
+  opacity: 1;
+  border-style: solid;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+}
+.g-ach-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14.5px;
+}
+.g-ach-head strong {
+  font-weight: 400;
+}
+.g-ach-count {
+  margin-left: auto;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted, color-mix(in srgb, currentColor 60%, transparent));
+}
+.g-ach .g-bar {
+  height: 5px;
+}
+/* The unlock. Named by key from ConnectOutcome.unlocked, so only the one that
+   actually fired reacts. */
+.g-ach li.is-new {
+  animation: g-unlock 900ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes g-unlock {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 40%, transparent);
+  }
+  30% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 16px transparent;
+  }
+}
+
+/* --- Phone ----------------------------------------------------------------- */
+@media (max-width: 560px) {
+  .g-hud {
+    grid-template-columns: 1fr;
+  }
+  .g-figure {
+    font-size: 32px;
+  }
+}
+
+/* --- Reduced motion --------------------------------------------------------
+   NOT a blanket `animation: none`. Each of these animations carries a piece of
+   meaning, and the rule is that the meaning survives with the movement gone:
+
+   - the pip still empties, instantly, so the count is still right;
+   - the streak ring still marks the extension, as a steady thickened ring
+     instead of a pop, held long enough to notice;
+   - the XP delta still appears and still says "+10" — it simply sits still and
+     fades rather than flying;
+   - the level-up card still takes over the screen. It is the moment; removing
+     it because someone dislikes movement would delete the content, not the
+     motion. It only stops sliding in — and LevelUpMoment stops auto-dismissing
+     too, because a card that vanishes on its own is itself motion.
+   =========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .g-pip > i {
+    transition: none;
+  }
+  .g-pip.is-spending {
+    animation: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 35%, transparent);
+  }
+  .g-streak.is-extended .g-streak-mark {
+    animation: none;
+    border-width: 4px;
+  }
+  .g-streak.is-extended .g-flame {
+    animation: none;
+  }
+  .g-bar > .g-fill {
+    transition: none;
+  }
+  .g-delta {
+    animation: g-delta-hold 1600ms ease-out forwards;
+    transform: translateY(-4px);
+  }
+  @keyframes g-delta-hold {
+    0%,
+    75% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+  .g-levelup,
+  .g-levelup-card {
+    animation: none;
+  }
+  .g-levelup-ring::after {
+    animation: none;
+    opacity: 0;
+  }
+  .g-ach li {
+    transition: none;
+  }
+  .g-ach li.is-new {
+    animation: none;
+    border-width: 2px;
+    box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 30%, transparent);
+  }
+}

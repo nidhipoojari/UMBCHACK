@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Ban, Check, Fingerprint, KeyRound, Loader2, Radio, ScrollText, ShieldCheck } from 'lucide-react';
 
 import { firebaseAuth } from '@/lib/firebase';
+import { VerifiedBadges } from '@/components/VerifiedBadges';
+import { parseAgentName, verifyAgent } from '@/lib/verification';
 
 /**
  * The agent-to-agent menu.
@@ -131,62 +133,93 @@ const FILTERS: readonly { key: Filter; label: string }[] = [
  */
 function AgentRow({ agent }: { agent: AgentCard }) {
   const revoked = agent.revokedAt !== null;
+  const parsed = parseAgentName(agent.agentName);
+
+  // Alumni are reached THROUGH this gateway rather than dialled directly, so
+  // they have no endpoint and no pinned key of their own. Drawing two dead
+  // badges on them would say "this person failed a check" when the truth is
+  // that the check does not apply to them.
+  const badged = agent.kind !== 'alumni';
+  const verification = verifyAgent({
+    agentName: agent.agentName,
+    role: agent.role,
+    endpoint: agent.endpoint,
+    fingerprint: agent.fingerprint,
+    revokedAt: agent.revokedAt,
+    registeredAt: agent.registeredAt,
+  });
+
+  // A student should not have to parse `agent://v1.employer.agenthire.biz` to
+  // learn that this is an employer at agenthire.biz. The raw name is still
+  // exact and still available — it moved into the details, where someone who
+  // wants to compare it against a fingerprint can find it.
+  const title = parsed
+    ? `${parsed.role.charAt(0).toUpperCase()}${parsed.role.slice(1)} agent`
+    : agent.agentName;
+
   return (
     <li className={`a2a-agent${agent.kind === 'unregistered' ? ' is-unknown' : ''}`}>
       <div className="a2a-agent-head">
-        <code className="a2a-name">{agent.agentName}</code>
-        {agent.role ? <span className="ws-pill">{agent.role}</span> : null}
+        <strong className="a2a-title">{title}</strong>
+        {parsed ? <span className="a2a-domain">{parsed.domain}</span> : null}
+        {badged ? <VerifiedBadges verification={verification} name={title} /> : null}
         {revoked ? <span className="ws-pill ws-pill--solid">revoked</span> : null}
-        {agent.kind === 'unregistered' ? (
-          <span className="ws-pill ws-pill--solid">not registered</span>
-        ) : null}
       </div>
 
-      <p className="a2a-key">
-        {agent.fingerprint ? (
-          <>
-            <Fingerprint size={13} aria-hidden="true" />
-            <span className="a2a-key-label">key fingerprint</span>
-            <code>{agent.fingerprint}</code>
-          </>
-        ) : (
-          <>
-            <KeyRound size={13} aria-hidden="true" />
-            <span className="a2a-key-label">no key pinned</span>
-            <span className="muted">
-              {agent.kind === 'alumni'
-                ? 'reached through this gateway, not dialled directly'
-                : 'nothing to check a signature against'}
-            </span>
-          </>
-        )}
-      </p>
+      <details className="a2a-details">
+        <summary>Details</summary>
 
-      {agent.endpoint ? (
         <p className="a2a-meta">
-          <span className="a2a-key-label">endpoint</span>
-          <code>{agent.endpoint}</code>
+          <span className="a2a-key-label">name</span>
+          <code>{agent.agentName}</code>
         </p>
-      ) : null}
 
-      {agent.jti ? (
-        <p className="a2a-meta">
-          <span className="a2a-key-label">envelope id</span>
-          <code>{agent.jti}</code>
+        <p className="a2a-key">
+          {agent.fingerprint ? (
+            <>
+              <Fingerprint size={13} aria-hidden="true" />
+              <span className="a2a-key-label">key fingerprint</span>
+              <code>{agent.fingerprint}</code>
+            </>
+          ) : (
+            <>
+              <KeyRound size={13} aria-hidden="true" />
+              <span className="a2a-key-label">no key pinned</span>
+              <span className="muted">
+                {agent.kind === 'alumni'
+                  ? 'reached through this gateway, not dialled directly'
+                  : 'nothing to check a signature against'}
+              </span>
+            </>
+          )}
         </p>
-      ) : null}
 
-      <p className="a2a-meta">
-        {agent.kind === 'alumni' ? (
-          <span className="muted">Introduced {when(agent.registeredAt)}.</span>
-        ) : agent.registeredAt ? (
-          <span className="muted">Registered {when(agent.registeredAt)}.</span>
+        {agent.endpoint ? (
+          <p className="a2a-meta">
+            <span className="a2a-key-label">endpoint</span>
+            <code>{agent.endpoint}</code>
+          </p>
         ) : null}
-        <span className="muted">
-          {agent.accepted} accepted · {agent.refused} refused
-          {agent.lastSeen ? ` · last heard ${when(agent.lastSeen)}` : ' · never heard from'}
-        </span>
-      </p>
+
+        {agent.jti ? (
+          <p className="a2a-meta">
+            <span className="a2a-key-label">envelope id</span>
+            <code>{agent.jti}</code>
+          </p>
+        ) : null}
+
+        <p className="a2a-meta">
+          {agent.kind === 'alumni' ? (
+            <span className="muted">Introduced {when(agent.registeredAt)}.</span>
+          ) : agent.registeredAt ? (
+            <span className="muted">Registered {when(agent.registeredAt)}.</span>
+          ) : null}
+          <span className="muted">
+            {agent.accepted} accepted · {agent.refused} refused
+            {agent.lastSeen ? ` · last heard ${when(agent.lastSeen)}` : ' · never heard from'}
+          </span>
+        </p>
+      </details>
     </li>
   );
 }
@@ -271,12 +304,14 @@ export function AgentMenu() {
         >
           <span style={{ width: `${pct}%` }} />
         </div>
+        {/* Cut from three sentences to a clause. The argument — that this bar
+            is derived from real refusals and cannot be moved by using the app
+            — is made far better by the board below, where a check that has
+            never fired sits visibly at zero. The unclassified count stays
+            because it is a number, and nothing else on the page reports it. */}
         <p className="muted a2a-hint">
-          Counted from the refusal reasons in <code>a2a_audit</code>, not from a score column. A
-          check moves this bar when it actually turns something away — using the app does not.
-          {rank.unclassified > 0
-            ? ` ${rank.unclassified} recorded ${rank.unclassified === 1 ? 'reason matches' : 'reasons match'} none of the checks below, and ${rank.unclassified === 1 ? 'is' : 'are'} still in the trail.`
-            : ''}
+          From refusal reasons in <code>a2a_audit</code>, never a score column.
+          {rank.unclassified > 0 ? ` ${rank.unclassified} unmatched.` : ''}
         </p>
 
         <ul className="ws-stats a2a-stats">

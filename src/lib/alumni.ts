@@ -3,6 +3,8 @@ import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { db } from '@/lib/db';
+import { diffStates, gameStateFor, levelFor } from '@/lib/game';
+import type { ConnectOutcome } from '@/lib/game-contract';
 
 /**
  * The alumni network: matching a student to people who already walked their
@@ -62,7 +64,13 @@ export type AlumniAgent = {
   monthsToFirstJob: number | null;
   foundVia: string | null;
   internships: number | null;
-  /** Grounded advice, assembled from this row plus the cohort. */
+  /** One scannable line for the card: role at employer. */
+  headline: string;
+  /**
+   * The fuller, cohort-aware version. Held back until the student actually
+   * reaches out — it is what the alumnus "replies", and printing it on every
+   * card was what turned the roster into a wall of near-identical paragraphs.
+   */
   advice: string;
   /** Already connected — the roster shows these differently and grants no XP. */
   connected: boolean;
@@ -166,7 +174,16 @@ export async function cohortStats(major: string, track: string | null): Promise<
  * sentinel, so an alumnus with a sparse row says less instead of saying
  * something invented.
  */
-function adviceFor(agent: Omit<AlumniAgent, 'advice' | 'connected'>, stats: CohortStats): string {
+/** The card line. Role and employer only — everything else is a pill. */
+function headlineFor(agent: { jobTitle: string | null; employer: string | null }): string {
+  if (agent.jobTitle && agent.employer) return `${agent.jobTitle} at ${agent.employer}`;
+  return agent.jobTitle ?? agent.employer ?? 'First destination not reported';
+}
+
+function adviceFor(
+  agent: Omit<AlumniAgent, 'advice' | 'connected' | 'headline'>,
+  stats: CohortStats,
+): string {
   const parts: string[] = [];
 
   if (agent.jobTitle && agent.employer) {
@@ -245,7 +262,8 @@ export async function alumniRoster(
     internship_count: string | null;
     connected: boolean;
   }>(
-    `SELECT a.campus_id, a.major, a.track, a.degree_level, a.graduation_year,
+    `SELECT DISTINCT ON (a.first_job_found_via)
+            a.campus_id, a.major, a.track, a.degree_level, a.graduation_year,
             a.first_job_title, a.first_employer, a.first_employer_industry,
             a.first_job_region, a.first_job_is_remote, a.months_to_first_job,
             a.first_job_found_via, a.internship_count,
@@ -257,13 +275,17 @@ export async function alumniRoster(
         AND a.first_destination = 'Employed Full-Time'
         AND a.first_job_title IS NOT NULL
         AND a.first_job_title NOT IN ('Not Applicable', 'No Response', '')
-      ORDER BY CASE WHEN a.months_to_first_job ~ '${NUMERIC_SQL}'
-                     THEN a.months_to_first_job::numeric END NULLS LAST,
+        AND a.first_job_found_via NOT IN ('Not Applicable', 'No Response', '')
+      ORDER BY a.first_job_found_via,
+               CASE WHEN a.months_to_first_job ~ '${NUMERIC_SQL}'
+                    THEN a.months_to_first_job::numeric END NULLS LAST,
                a.campus_id
       LIMIT $3`,
     params,
   );
 
+  // DISTINCT ON had to order by the route to pick one per route; the student
+  // wants them fastest-first, so the final ordering happens here. Eight rows.
   return rows.map((row) => {
     const base = {
       campusId: row.campus_id,
@@ -283,8 +305,14 @@ export async function alumniRoster(
       foundVia: clean(row.first_job_found_via),
       internships: NUMERIC_RE.test(row.internship_count ?? '') ? Number(row.internship_count) : null,
     };
-    return { ...base, advice: adviceFor(base, stats), connected: row.connected };
-  });
+    return {
+      ...base,
+      headline: headlineFor(base),
+      advice: adviceFor(base, stats),
+      connected: row.connected,
+    };
+  })
+    .sort((a, b) => (a.monthsToFirstJob ?? 1e9) - (b.monthsToFirstJob ?? 1e9));
 }
 
 /** The cohorts a student can pick from — the dataset's own values, not a guess. */
@@ -315,9 +343,14 @@ export type Progress = {
   routesUnlocked: string[];
 };
 
-const LEVEL_TITLES = ['Cold outreach', 'Making contact', 'Known quantity', 'Well connected', 'Networked'];
+/**
+ * The XP rate. The ranks and the per-level threshold moved to
+ * lib/game-contract.ts, and the level arithmetic to `levelFor` in lib/game.ts,
+ * because /api/game now answers the same question. Two copies of "what rank is
+ * 60 XP" is one more than the number that can be right, and the copy that is
+ * not edited is the one the user sees.
+ */
 const XP_PER_CONNECTION = 10;
-const XP_PER_LEVEL = 50;
 
 /**
  * Progress is DERIVED, never stored.
@@ -345,16 +378,15 @@ export async function progressFor(userId: string): Promise<Progress> {
   );
 
   const connections = Number(rows[0]?.connections ?? 0);
-  const xp = connections * XP_PER_CONNECTION;
-  const level = Math.min(LEVEL_TITLES.length - 1, Math.floor(xp / XP_PER_LEVEL));
+  const level = levelFor(connections * XP_PER_CONNECTION);
 
   return {
     connections,
-    xp,
-    level,
-    levelTitle: LEVEL_TITLES[level],
-    xpIntoLevel: xp % XP_PER_LEVEL,
-    xpForNextLevel: XP_PER_LEVEL,
+    xp: level.xp,
+    level: level.level,
+    levelTitle: level.title,
+    xpIntoLevel: level.xpIntoLevel,
+    xpForNextLevel: level.xpForNextLevel,
     routesUnlocked: rows[0]?.routes ?? [],
   };
 }
@@ -364,9 +396,25 @@ export function alumniAgentName(campusId: string): string {
   return `agent://v1.alumni.agenthire.biz/${campusId}`;
 }
 
-export type ConnectResult =
-  | { ok: true; alreadyConnected: boolean; jti: string; reply: string; progress: Progress }
-  | { ok: false; error: string };
+/**
+ * What a connection attempt returns.
+ *
+ * ConnectOutcome IS THE CONTRACT and is not widened — this is that type plus
+ * three fields the alumni page already renders and the contract has no slot
+ * for: the alumnus's `reply`, the `jti` the exchange was audited under, and
+ * `alreadyConnected`. A superset is assignable to `ConnectOutcome`, so every
+ * caller written against the contract keeps working unchanged, and dropping
+ * `reply` to make the shapes match exactly would have deleted the only thing
+ * the student actually came for — the answer. `progress` is the pre-game shape
+ * src/components/AlumniNetwork.tsx reads; it is derived from the same rows as
+ * `game.level` (see `progressFor`) and is kept until that component moves over.
+ */
+export type ConnectResult = ConnectOutcome & {
+  alreadyConnected: boolean;
+  jti: string;
+  reply: string;
+  progress: Progress;
+};
 
 /**
  * Reach out to an alumnus, and write the exchange down.
@@ -378,47 +426,43 @@ export type ConnectResult =
  * the body — the same rule the gateway already follows, and the reason the
  * student's question is safe to put in it.
  *
- * A repeat approach is recorded as `refused` rather than skipped silently. A
- * filter you cannot interrogate is indistinguishable from a bug, and "you have
- * already spoken to this person" is exactly the kind of decision that should be
- * legible afterwards.
+ * THERE ARE NOW THREE REFUSALS AND ALL THREE ARE AUDITED. A repeat approach
+ * was already recorded as `refused` rather than skipped silently; an approach
+ * with no energy left is recorded the same way, under its own reason, and so
+ * is an approach to a campus_id the dataset does not contain. A refusal nobody
+ * can read is indistinguishable from a bug — that is this codebase's own rule
+ * and it does not get weaker because the refusal is a game rule rather than a
+ * security one. "Why did nothing happen when I clicked" has an answer in the
+ * table, with a timestamp.
+ *
+ * ORDER MATTERS: DUPLICATE IS CHECKED BEFORE ENERGY. A second approach to
+ * someone already reached costs nothing, so it must not be refused for want of
+ * energy — otherwise the student is told they are out of budget by an action
+ * that would never have spent any, and a mis-click reads as a wasted day.
  */
 export async function connectToAlumnus(
   userId: string,
   campusId: string,
   question: string | null,
 ): Promise<ConnectResult> {
-  const { rows: found } = await db.query<{ campus_id: string }>(
-    `SELECT campus_id FROM alumni WHERE campus_id = $1`,
-    [campusId],
-  );
-  if (found.length === 0) return { ok: false, error: 'No such alumnus in this dataset.' };
-
   const jti = randomUUID();
   const agentName = alumniAgentName(campusId);
+  // base64url, NOT hex. The gateway writes this column as a 43-char base64url
+  // digest and sql/004_a2a.sql constrains it to exactly that; hex is the same
+  // bytes spelled differently, so it passed unnoticed here while making the
+  // migration un-re-runnable the moment one such row existed. One encoding, one
+  // column, one meaning.
   const payloadHash = createHash('sha256')
     .update(JSON.stringify({ from: userId, to: campusId, question }))
-    .digest('hex');
+    .digest('base64url');
 
-  const { rowCount } = await db.query(
-    `INSERT INTO alumni_connections (user_id, campus_id, jti, asked)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (user_id, campus_id) DO NOTHING`,
-    [userId, campusId, jti, question],
-  );
-  const alreadyConnected = rowCount === 0;
-
-  await db.query(
-    `INSERT INTO a2a_audit (direction, agent_name, jti, decision, reasons, payload_hash)
-     VALUES ('outbound', $1, $2, $3, $4, $5)`,
-    [
-      agentName,
-      jti,
-      alreadyConnected ? 'refused' : 'accepted',
-      alreadyConnected ? ['duplicate: already connected to this alumnus'] : ['alumni introduction requested'],
-      payloadHash,
-    ],
-  );
+  /** One audit row, same columns as the gateway's. */
+  const audit = (decision: 'accepted' | 'refused', reasons: string[]) =>
+    db.query(
+      `INSERT INTO a2a_audit (direction, agent_name, jti, decision, reasons, payload_hash)
+       VALUES ('outbound', $1, $2, $3, $4, $5)`,
+      [agentName, jti, decision, reasons, payloadHash],
+    );
 
   const { rows: one } = await db.query<{
     major: string;
@@ -433,7 +477,38 @@ export async function connectToAlumnus(
     [campusId],
   );
   const a = one[0];
+
+  if (!a) {
+    // Audited too. An approach to a campus_id that is not in the dataset is
+    // almost always a stale roster in someone's browser after a reload of the
+    // alumni table, and that is a fact about the deployment worth being able
+    // to count rather than a 404 that evaporates.
+    await audit('refused', ['unknown alumnus: no such campus_id in the current dataset']);
+    return {
+      ok: false,
+      error: 'No such alumnus in this dataset.',
+      counted: false,
+      energySpent: 0,
+      xpAwarded: 0,
+      levelUp: false,
+      streakExtended: false,
+      unlocked: [],
+      // No cohort to measure routes against, so none are offered. The student's
+      // own energy, streak and level are unaffected by that and are still real.
+      game: await gameStateFor(userId, []),
+      alreadyConnected: false,
+      jti,
+      reply: '',
+      progress: await progressFor(userId),
+    };
+  }
+
+  // The cohort is fetched ONCE and used for both game states below. Using the
+  // same routes either side of the insert is what makes the before/after diff
+  // meaningful: a different cohort would change the "every way in" target and
+  // could report an unlock that was only a change of denominator.
   const stats = await cohortStats(a.major, clean(a.track));
+
   const reply = adviceFor(
     {
       campusId,
@@ -456,5 +531,111 @@ export async function connectToAlumnus(
     stats,
   );
 
-  return { ok: true, alreadyConnected, jti, reply, progress: await progressFor(userId) };
+  const before = await gameStateFor(userId, stats.routes);
+
+  const { rows: existing } = await db.query<{ campus_id: string }>(
+    `SELECT campus_id FROM alumni_connections WHERE user_id = $1 AND campus_id = $2`,
+    [userId, campusId],
+  );
+
+  /** The shape shared by every path below. `game` and the deltas differ. */
+  const base = { alreadyConnected: existing.length > 0, jti, reply };
+
+  if (existing.length > 0) {
+    await audit('refused', ['duplicate: already connected to this alumnus']);
+    // ok: TRUE. A duplicate is not an error — the student asked a question and
+    // gets the same answer back. It simply did not count, which is what
+    // `counted: false` says. Returning ok:false here would make the alumni page
+    // show a red banner for pressing a button twice.
+    return {
+      ...base,
+      ok: true,
+      counted: false,
+      energySpent: 0,
+      xpAwarded: 0,
+      levelUp: false,
+      streakExtended: false,
+      unlocked: [],
+      game: before,
+      progress: await progressFor(userId),
+    };
+  }
+
+  if (before.energy.remaining <= 0) {
+    await audit('refused', [
+      `out of energy: ${before.energy.max} connections already made this UTC day`,
+    ]);
+    return {
+      ...base,
+      ok: false,
+      error: `That is all ${before.energy.max} connections for today. More at midnight UTC.`,
+      counted: false,
+      energySpent: 0,
+      xpAwarded: 0,
+      levelUp: false,
+      streakExtended: false,
+      unlocked: [],
+      game: before,
+      progress: await progressFor(userId),
+    };
+  }
+
+  /**
+   * THE INSERT IS THE CHECK, for both rules at once.
+   *
+   * The energy test is a subquery inside the INSERT rather than the `if` above
+   * on its own, and the duplicate test stays the ON CONFLICT it always was.
+   * Two requests arriving together would each pass a check-then-act in
+   * application code and both write; here the second one's `rowCount` comes
+   * back 0 and it spends nothing. The window is not mathematically closed —
+   * READ COMMITTED lets two statements each see the same pre-insert count —
+   * but it is one statement wide instead of three round trips, and the same
+   * shape the schema comment already praises for the duplicate rule.
+   */
+  const { rowCount } = await db.query(
+    `INSERT INTO alumni_connections (user_id, campus_id, jti, asked)
+     SELECT $1, $2, $3, $4
+      WHERE (SELECT count(*)
+               FROM alumni_connections
+              WHERE user_id = $1
+                AND created_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+            ) < $5
+     ON CONFLICT (user_id, campus_id) DO NOTHING`,
+    [userId, campusId, jti, question, before.energy.max],
+  );
+
+  if (rowCount === 0) {
+    // Lost a race — against a duplicate or against the day's last unit of
+    // energy. Which one is no longer knowable from here, and the honest reason
+    // string says so rather than guessing at one of the two.
+    await audit('refused', ['refused at write: duplicate or no energy left this UTC day']);
+    return {
+      ...base,
+      ok: false,
+      error: 'That connection did not go through. Try again in a moment.',
+      counted: false,
+      energySpent: 0,
+      xpAwarded: 0,
+      levelUp: false,
+      streakExtended: false,
+      unlocked: [],
+      game: await gameStateFor(userId, stats.routes),
+      progress: await progressFor(userId),
+    };
+  }
+
+  await audit('accepted', ['alumni introduction requested']);
+
+  const after = await gameStateFor(userId, stats.routes);
+
+  return {
+    ...base,
+    ok: true,
+    counted: true,
+    energySpent: 1,
+    xpAwarded: after.level.xp - before.level.xp,
+    ...diffStates(before, after),
+    game: after,
+    progress: await progressFor(userId),
+  };
 }
