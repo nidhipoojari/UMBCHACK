@@ -3,7 +3,7 @@ import type { Role } from '@/lib/users';
 import type { WorkspaceLink } from './WorkspaceNav';
 
 /**
- * Each workspace's destinations, ordered as the work happens (as in VT Hacks).
+ * Each workspace's destinations, ordered as the work happens.
  *
  * Applicant: find a role, track it, send it, then read back what the agent did.
  * Agents sits between sending and the activity log because that is where the

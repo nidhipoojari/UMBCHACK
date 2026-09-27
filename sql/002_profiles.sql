@@ -7,8 +7,7 @@
 --
 -- Idempotent: safe to re-run.
 
--- applicant_profiles — ported from VT Hacks' `profiles` (one current row per
--- user, the header of the profile page), Delta -> Postgres.
+-- applicant_profiles — one current row per user, the header of the profile page.
 CREATE TABLE IF NOT EXISTS applicant_profiles (
   user_id          TEXT        PRIMARY KEY REFERENCES users (user_id) ON DELETE CASCADE,
   full_name        TEXT,
@@ -24,10 +23,8 @@ CREATE TABLE IF NOT EXISTS applicant_profiles (
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- employer_profiles — VT Hacks had no employer table (one hard-coded employer
--- agent). Built from the employer fields its schema did carry in
--- job_agent_links (domain, agent id, ANS name, endpoint) plus the company and
--- contact details a per-account employer needs.
+-- employer_profiles — one row per employer account: the company and contact
+-- details, plus the employer agent's domain, id, name and endpoint.
 CREATE TABLE IF NOT EXISTS employer_profiles (
   user_id           TEXT        PRIMARY KEY REFERENCES users (user_id) ON DELETE CASCADE,
   company_name      TEXT,

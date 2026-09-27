@@ -5,7 +5,7 @@
  * Cloud Function. Used on Jobs (every match) and Overview (the top few, plus
  * the headline numbers).
  */
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 
 import type { JobMatch, MatchesResponse } from '@/lib/matches';
@@ -59,15 +59,11 @@ function MatchRow({ match, detailed }: { match: JobMatch; detailed: boolean }) {
     <li className="ws-row ws-match">
       <div>
         <h3>
-          {match.url ? (
-            <a href={match.url} target="_blank" rel="noopener noreferrer">
-              {match.title}
-              <ArrowUpRight size={15} aria-hidden="true" />
-              <span className="sr-only"> (opens the posting in a new tab)</span>
-            </a>
-          ) : (
-            match.title
-          )}
+          <Link href={`/applicant/jobs/${encodeURIComponent(match.job_id)}`}>
+            {match.title}
+            <ArrowRight size={15} aria-hidden="true" />
+            <span className="sr-only"> (open this role, save it or autofill the application)</span>
+          </Link>
         </h3>
         <p>{meta}</p>
         {match.reason ? <p className="ws-match__why">{match.reason}</p> : null}

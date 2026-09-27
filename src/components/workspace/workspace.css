@@ -1,8 +1,7 @@
 /* ===========================================================================
    WORKSPACE — the side nav, the chat drawer, and the placeholder pages.
 
-   Ported from VT Hacks (globals.css side nav, account.css, voice.css) onto
-   agentHire's tokens: white paper, ink, rounded cards, ink hairlines. The
+   Built on agentHire's tokens: white paper, ink, rounded cards, ink hairlines. The
    page-width variables (--nav-w, --drawer-w) and the body padding that makes
    room for both panels live in globals.css.
    =========================================================================== */
@@ -381,6 +380,7 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
 .ws-head { padding: 12px 0 28px; max-width: 64ch; }
 .ws-head h1 { font-size: clamp(32px, 4.6vw, 48px); line-height: 1.06; margin: 10px 0 12px; }
 .ws-head p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 18px; line-height: 1.6; }
+.ws-head p a { color: var(--ink); text-underline-offset: 3px; }
 
 /* Says, on every page, that the numbers are not real yet. */
 .ws-sample {

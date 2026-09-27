@@ -4,7 +4,7 @@ import { GoogleSignInForm } from '@/components/GoogleSignInForm';
 import { SignInForm } from '@/components/SignInForm';
 import { isGoogleConfigured } from '@/lib/providers';
 
-export const metadata = { title: 'Sign in · HireWire' };
+export const metadata = { title: 'Sign in · agentHire' };
 
 export default async function SignInPage({
   searchParams,

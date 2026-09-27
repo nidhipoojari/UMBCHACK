@@ -1,0 +1,216 @@
+/* Job page toolbox: the five instant reads, the drafts, and the document history. */
+
+.jd-wrap { display: grid; gap: 0; }
+
+.jd-group { margin-top: 34px; }
+.jd-group > p { color: var(--muted); line-height: 1.6; max-width: 72ch; margin: 6px 0 18px; }
+.jd-reason { margin: 0; line-height: 1.6; max-width: 68ch; overflow-wrap: break-word; }
+.jd-empty { color: var(--muted); line-height: 1.6; max-width: 68ch; }
+.jd-blocked { margin-top: 16px; }
+
+/* Folded extras: how the reads work, and the optional draft steering. */
+.jd-optional { margin-top: 24px; max-width: 62ch; }
+.jd-method { margin-top: 30px; max-width: 82ch; }
+.jd-optional > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  list-style: none;
+  cursor: pointer;
+}
+.jd-optional > summary::-webkit-details-marker { display: none; }
+.jd-optional > summary:hover .jd-jd__open { text-decoration: underline; text-underline-offset: 4px; }
+.jd-optional .jd-jd__open::before {
+  content: '+';
+  display: inline-block;
+  width: 1.1em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.jd-optional[open] > summary .jd-jd__open::before { content: '–'; }
+
+.jd-methods { margin: 18px 0 0; display: grid; gap: 0; }
+.jd-methods > div { padding: 16px 0; border-top: 1px solid var(--line); }
+.jd-methods > div:first-child { border-top: 0; padding-top: 0; }
+.jd-methods dt { margin: 0 0 6px; font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.jd-methods dd { margin: 0; color: var(--ink); font-size: 16px; line-height: 1.65; max-width: 76ch; }
+
+/* The three one-word reads, as a strip of stats. */
+.jd-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin: 0;
+}
+.jd-stat { padding: 22px 28px 24px 0; min-width: 0; }
+.jd-stat + .jd-stat { padding-left: 28px; border-left: 1px solid var(--line); }
+.jd-stat dt { margin: 0 0 12px; font-size: 13px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.jd-stat dd { margin: 0; display: grid; gap: 8px; }
+.jd-stat b {
+  font-size: clamp(24px, 2.6vw, 31px);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  overflow-wrap: break-word;
+}
+.jd-stat__flag { font-size: 14px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.jd-stat__why { font-size: 15px; line-height: 1.6; color: var(--muted); }
+
+/* The two list reads. */
+.jd-reads-out { display: grid; gap: 0; }
+.jd-read { margin-top: 30px; padding-top: 24px; border-top: 1px solid var(--line); display: grid; gap: 14px; }
+.jd-read:first-child { border-top: 0; padding-top: 0; }
+.jd-read h3, .jd-result h3 { font-size: 21px; }
+.jd-read .jd-reason, .jd-result .jd-reason { color: var(--muted); }
+
+.jd-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin: 0; }
+.jd-lists > div { display: grid; gap: 6px; align-content: start; }
+.jd-lists small { letter-spacing: 0.14em; }
+.jd-chips { display: flex; flex-wrap: wrap; gap: 7px; padding: 0; margin: 0; list-style: none; }
+.jd-chips li { border: 1px solid var(--line-strong); padding: 4px 10px; font-size: 14.5px; overflow-wrap: break-word; }
+.jd-chips--gap li { border-color: color-mix(in srgb, var(--failure) 45%, transparent); color: var(--failure); }
+.jd-chips--have li { border-color: color-mix(in srgb, var(--success) 45%, transparent); color: var(--success); }
+
+.jd-bullets { display: grid; gap: 14px; padding: 0; margin: 0; list-style: none; }
+.jd-bullets li { border-left: 2px solid var(--line-strong); padding-left: 14px; line-height: 1.55; overflow-wrap: break-word; }
+.jd-bullets li.is-lead { border-left-color: var(--success); }
+.jd-bullets .jd-why { display: block; color: var(--muted); font-size: 15px; margin-top: 4px; }
+
+.jd-aside {
+  margin: 26px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 70ch;
+}
+.jd-aside a, .jd-link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Draft buttons. */
+.jd-tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+  gap: 14px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.jd-tool {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  color: var(--ink);
+  font: inherit;
+  padding: 16px 17px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.jd-tool:hover:not(:disabled) { border-color: var(--ink); background: var(--wash); }
+.jd-tool:disabled { border-style: dashed; color: var(--muted); cursor: not-allowed; }
+.jd-tool strong { font-weight: 400; font-size: 19px; }
+.jd-tool .jd-cost { font-size: 13.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.jd-tool--paid .jd-cost { color: var(--success); }
+.jd-tool .jd-what { font-size: 15px; line-height: 1.5; color: var(--muted); }
+.jd-tool--busy strong::after { content: ' …'; }
+
+.jd-field { display: grid; gap: 6px; max-width: 54ch; margin-top: 18px; }
+.jd-field label { font-size: 15px; color: var(--muted); line-height: 1.5; }
+.jd-field input, .jd-field textarea {
+  font: inherit;
+  font-size: 16px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  padding: 10px 12px;
+}
+.jd-field textarea { min-height: 4.5em; resize: vertical; }
+
+/* Where a draft lands. */
+.jd-out { display: grid; gap: 0; }
+.jd-out:focus { outline: none; }
+.jd-out:focus-visible { outline: 2px solid var(--ink); outline-offset: 8px; }
+.jd-status { margin: 22px 0 0; min-height: 1.6em; line-height: 1.6; color: var(--ink); max-width: 72ch; }
+.jd-status:empty { margin-top: 0; }
+.jd-out .jd-working { border-left: 2px solid var(--line-strong); padding-left: 15px; color: var(--muted); }
+.jd-out[data-busy='true'] .jd-working { border-left-color: var(--ink); color: var(--ink); }
+.jd-out .jd-working + * { margin-top: 8px; }
+
+.jd-result { border-top: 1px solid var(--line); margin-top: 30px; padding-top: 24px; display: grid; gap: 14px; }
+.jd-doc {
+  border: 1px solid var(--line-strong);
+  padding: 22px;
+  white-space: pre-wrap;
+  line-height: 1.65;
+  font-size: 17px;
+  max-width: 74ch;
+  margin: 0;
+}
+.jd-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+
+/* The fact check. */
+.jd-verdict { border: 2px solid var(--line-strong); padding: 18px 20px; display: grid; gap: 10px; max-width: 74ch; }
+.jd-verdict--pass { border-color: color-mix(in srgb, var(--success) 60%, transparent); }
+.jd-verdict--warn { border-color: var(--line-strong); border-style: dashed; }
+.jd-verdict--block { border-color: var(--failure); background: color-mix(in srgb, var(--failure) 6%, transparent); }
+.jd-verdict h4 { margin: 0; font-size: 18px; font-weight: 400; }
+.jd-findings { display: grid; gap: 12px; padding: 0; margin: 0; list-style: none; }
+.jd-findings li { line-height: 1.55; font-size: 16px; }
+.jd-findings code { border: 1px solid var(--line-strong); padding: 1px 6px; overflow-wrap: break-word; }
+.jd-findings .is-block code { border-color: var(--failure); color: var(--failure); }
+
+/* Documents already written. */
+.jd-history { display: grid; gap: 12px; padding: 0; margin: 14px 0 0; list-style: none; }
+.jd-history li {
+  border: 1px solid var(--line);
+  padding: 14px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: baseline;
+}
+.jd-history strong { overflow-wrap: break-word; text-transform: capitalize; }
+.jd-history .jd-when { color: var(--muted); font-size: 14.5px; }
+
+@media (max-width: 900px) {
+  .jd-optional { max-width: none; }
+}
+
+@media (max-width: 760px) {
+  .jd-group { margin-top: 28px; }
+  .jd-result { margin-top: 24px; padding-top: 20px; }
+  .jd-doc { padding: 16px; font-size: 16px; }
+  .jd-verdict { padding: 15px 16px; }
+  .jd-history li { display: grid; gap: 5px; padding: 13px 14px; }
+}
+
+@media (max-width: 720px) {
+  .jd-stats { grid-template-columns: 1fr; }
+  .jd-stat { padding: 20px 0; }
+  .jd-stat + .jd-stat { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+}
+
+@media (max-width: 560px) {
+  .jd-tools { grid-template-columns: 1fr; }
+  .jd-tool { padding: 14px 15px; }
+  .jd-tool strong { font-size: 18px; }
+  .jd-lists { grid-template-columns: 1fr; gap: 16px; }
+}
