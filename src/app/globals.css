@@ -24,10 +24,12 @@
   --line: color-mix(in srgb, var(--ink) 9%, transparent);
   --line-strong: color-mix(in srgb, var(--ink) 18%, transparent);
   --muted: color-mix(in srgb, var(--ink) 60%, transparent);
-  --wash: color-mix(in srgb, var(--ink) 3.5%, transparent);
+  --wash: color-mix(in srgb, var(--ink) 3.5%, var(--paper));
 
-  --card: color-mix(in srgb, var(--ink) 3%, transparent);
-  --card-hover: color-mix(in srgb, var(--ink) 5.5%, transparent);
+  /* Mixed into the paper rather than into transparency, so every card is
+     solid and the star field behind the page never shows through one. */
+  --card: color-mix(in srgb, var(--ink) 3%, var(--paper));
+  --card-hover: color-mix(in srgb, var(--ink) 5.5%, var(--paper));
   --radius: 18px;
   --glow: 0 18px 40px -20px color-mix(in srgb, var(--ink) 35%, transparent);
 
@@ -131,12 +133,12 @@ nav {
   gap: 28px;
   font-size: 15px;
 }
-/* Full-bleed frosted glass: content blurs as it scrolls under the nav. */
+/* Full-bleed solid paper, so neither content nor stars show through the nav. */
 nav::before {
   content: '';
   position: absolute;
   inset: 0 calc(50% - var(--vw-avail) / 2);
-  background: color-mix(in srgb, var(--paper) 72%, transparent);
+  background: var(--paper);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid var(--line);
@@ -202,26 +204,20 @@ a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visibl
 }
 .skip-link:focus { left: 16px; }
 
-/* Cursor sparkles: one fixed layer over everything, never catching a click.
-   Each spark is centred on its point with a negative translate baked into the
-   margin, so anime.js owns the transform outright. */
-.sparkles {
+/* Star field: fixed behind the whole landing page, never catching a click.
+   The glow at the foot is the reference's horizon, in ink instead of rose. */
+.starfield {
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: -1;
   pointer-events: none;
-  overflow: hidden;
+  background: radial-gradient(
+    120% 55% at 50% 110%,
+    color-mix(in srgb, var(--ink) 9%, transparent),
+    transparent 70%
+  );
 }
-.spark {
-  position: absolute;
-  display: block;
-  color: var(--ink);
-  will-change: transform, opacity;
-}
-.spark > svg { display: block; transform: translate(-50%, -50%); }
-.spark--dust { border-radius: 50%; background: var(--ink); translate: -50% -50%; }
-/* The big flash is a touch lighter so it reads as light, not as a stamp. */
-.spark--glint { color: color-mix(in srgb, var(--ink) 55%, transparent); }
+.starfield__canvas { position: absolute !important; inset: 0; pointer-events: none; }
 
 .sr-only {
   position: absolute;
@@ -1432,7 +1428,7 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 }
 .gate .gate__last {
   color: var(--success);
-  background: color-mix(in srgb, var(--success) 8%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, var(--paper));
 }
 .gate .gate__last::before { content: '→'; color: var(--success); letter-spacing: 0; }
 
@@ -1467,7 +1463,7 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 .wire__turn--you {
   margin-right: auto;
   border-bottom-left-radius: 4px;
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--paper));
 }
 .wire__turn--them {
   margin-left: auto;
@@ -1494,7 +1490,7 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
   margin-top: 16px;
   padding: 24px;
   border-radius: 14px;
-  background: color-mix(in srgb, var(--success) 7%, transparent);
+  background: color-mix(in srgb, var(--success) 7%, var(--paper));
   justify-items: center;
   text-align: center;
 }

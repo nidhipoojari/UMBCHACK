@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { Forum } from 'next/font/google';
 
-import { CursorSparkles } from '@/components/CursorSparkles';
 import { LenisProvider } from '@/components/LenisProvider';
 
 import './globals.css';
@@ -23,7 +22,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           Skip to content
         </a>
         <LenisProvider />
-        <CursorSparkles />
         {children}
       </body>
     </html>

@@ -7,6 +7,7 @@ import { ArchitectureRail } from '@/components/ArchitectureRail';
 import { CountUp } from '@/components/CountUp';
 import { FeatureMarquee } from '@/components/FeatureMarquee';
 import { Reveal } from '@/components/Reveal';
+import { Starfield } from '@/components/Starfield';
 
 /** What it does besides the verification, in as few words as each will take.
  *  Each one is kept short enough to hold a single line at 19px in a half-column,
@@ -161,6 +162,8 @@ const paths = [
 export default function Home() {
   return (
     <main id="main">
+      <Starfield />
+
       {/* One control, and no wordmark: the hero below already says the name.
           Signing up is not lost: both pathway CTAs at the foot of the page go
           straight to /signup with the role already chosen. */}
