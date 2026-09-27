@@ -60,8 +60,16 @@ export const ACCOUNT_HREF: Record<Role, string> = {
   employer: '/employer/account',
 };
 
+/** Pages with no link of their own, and the section they sit under. */
+const SECTION_OF: Record<string, string> = {
+  '/applicant/interview': '/applicant/pipeline',
+};
+
 /** The link a path belongs to: the longest href that prefixes it. */
 export function currentLink(role: Role, pathname: string): WorkspaceLink | null {
+  for (const [prefix, section] of Object.entries(SECTION_OF)) {
+    if (pathname.startsWith(`${prefix}/`)) pathname = section;
+  }
   let best: WorkspaceLink | null = null;
   for (const link of WORKSPACE_LINKS[role]) {
     const matches = pathname === link.href || pathname.startsWith(`${link.href}/`);

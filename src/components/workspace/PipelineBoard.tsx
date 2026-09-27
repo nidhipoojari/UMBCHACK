@@ -15,6 +15,7 @@ import {
   type PipelineStatus,
 } from '@/lib/pipeline-contract';
 
+import { StartInterviewButton, offersInterview } from './StartInterviewButton';
 import './pipeline.css';
 
 function cardName(card: PipelineCard): string {
@@ -223,6 +224,17 @@ function Card({
       </p>
 
       {stalled ? <p className="pipe-card-stalled">{stalled}</p> : null}
+
+      {offersInterview(card.status) ? (
+        <div className="pipe-card-rehearse">
+          <StartInterviewButton
+            jobId={card.job_id}
+            status={card.status}
+            label={`${role} at ${company}`}
+            className="ws-button ws-button--quiet pipe-rehearse-button"
+          />
+        </div>
+      ) : null}
 
       <details className="pipe-card-more" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
         <summary>

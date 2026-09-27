@@ -117,6 +117,9 @@
 @keyframes pipe-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pipeline-save .spin { animation: none; } }
 
+.pipe-card-rehearse { margin-top: 12px; }
+.pipe-rehearse-button { font-size: 14px; padding: 7px 14px; }
+
 /* Wide screens: all seven stages side by side. */
 @media (min-width: 1200px) {
   .pipe-board { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; border-top: 1px solid var(--line-strong); }

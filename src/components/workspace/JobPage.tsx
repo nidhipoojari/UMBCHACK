@@ -11,6 +11,7 @@ import { isPipelineStatus } from '@/lib/pipeline-contract';
 import { EmployerCheck } from './EmployerCheck';
 import { JobToolboxPanel } from './JobToolbox';
 import { SavePipelineButton } from './SavePipelineButton';
+import { StartInterviewButton, offersInterview } from './StartInterviewButton';
 
 import './job-page.css';
 
@@ -173,6 +174,17 @@ export function JobPage({ jobId }: { jobId: string }) {
           This posting was not in your matches, so there is no fit score for it. The reads below show how you line up.
         </p>
       )}
+
+      {isPipelineStatus(stage) && offersInterview(stage) ? (
+        <section className="jp-rehearse" aria-labelledby="jp-rehearse-h">
+          <h2 id="jp-rehearse-h">Rehearse this interview</h2>
+          <p>
+            A mock interview built from this posting and your gaps. Gemini writes the questions and can read them aloud;
+            answer typed or out loud, and get a readout at the end.
+          </p>
+          <StartInterviewButton jobId={job.job_id} status={stage} />
+        </section>
+      ) : null}
 
       {job.has_description ? (
         <section className="panel" aria-labelledby="jp-posting-h">
