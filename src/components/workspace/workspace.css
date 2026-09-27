@@ -669,7 +669,8 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   flex-wrap: wrap;
 }
 .alumni-id strong {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans), Georgia, serif;
+  font-variant-numeric: tabular-nums;
   font-size: 0.92rem;
 }
 
@@ -761,14 +762,16 @@ html[data-sidenav] main.ws-main { padding-top: 40px; }
   font-weight: 400;
 }
 
-/* Mono for anything an operator would paste into a query: agent names, key
-   fingerprints, envelope ids, payload hashes. `anywhere` rather than
+/* Anything an operator would paste into a query: agent names, key
+   fingerprints, envelope ids, payload hashes. Forum like everything else, with
+   tabular figures so long ids stay even. `anywhere` rather than
    break-word because a 43-character fingerprint has no break opportunity at
    all and would otherwise push the card wider than a phone. */
 .a2a-name,
 .a2a-key code,
 .a2a-meta code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-sans), Georgia, serif;
+  font-variant-numeric: tabular-nums;
   font-size: 0.84rem;
   overflow-wrap: anywhere;
 }

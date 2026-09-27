@@ -93,7 +93,10 @@ body {
 
 ::selection { background: var(--ink); color: var(--paper); }
 
-button { font: inherit; cursor: pointer; }
+/* Form controls do not inherit the page font by default; without this every
+   input, select and textarea falls back to the browser's system face. */
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
 code { font-family: var(--font-sans), Georgia, serif; font-size: 0.92em; }
 
 main { max-width: 1280px; margin: auto; padding: 0 var(--gutter) 96px; }
