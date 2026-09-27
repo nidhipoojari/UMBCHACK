@@ -93,7 +93,10 @@ body {
 
 ::selection { background: var(--ink); color: var(--paper); }
 
-button { font: inherit; cursor: pointer; }
+/* Form controls do not inherit the page font by default; without this every
+   input, select and textarea falls back to the browser's system face. */
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
 code { font-family: var(--font-sans), Georgia, serif; font-size: 0.92em; }
 
 main { max-width: 1280px; margin: auto; padding: 0 var(--gutter) 96px; }
@@ -304,9 +307,37 @@ main, [id] { scroll-margin-top: 100px; }
 }
 
 .greeter { display: flex; flex-direction: column; align-items: center; gap: 22px; margin-top: 40px; }
-/* The head sits in a pool of its own light. */
-.greeter > div:first-child {
+/* The head sits in a pool of its own light, and is the button that starts a
+   voice conversation. */
+.greeter__face {
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
   filter: drop-shadow(0 18px 30px color-mix(in srgb, var(--ink) 18%, transparent));
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.greeter__face:hover { transform: scale(1.03); }
+.greeter__face:focus-visible { outline: 2px solid var(--ink); outline-offset: 8px; }
+/* While it listens, a ring breathes around the head. */
+.greeter__face::after {
+  content: '';
+  position: absolute;
+  inset: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  opacity: 0;
+  pointer-events: none;
+}
+.greeter__face.is-listening::after { animation: greeter-listen 1.6s ease-out infinite; }
+@keyframes greeter-listen {
+  0% { opacity: 0.45; transform: scale(0.96); }
+  100% { opacity: 0; transform: scale(1.18); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .greeter__face.is-listening::after { animation: none; opacity: 0.35; }
 }
 /* The caption reads like a live terminal line under the agent. */
 .greeter__caption {
@@ -323,6 +354,16 @@ main, [id] { scroll-margin-top: 100px; }
   transition: color 0.4s ease;
 }
 .greeter__caption::before { content: '› '; color: var(--accent); }
+/* A real conversation runs to full sentences, so the pill becomes a card. */
+.greeter__caption.is-live { color: var(--ink); border-radius: var(--radius); text-align: left; }
+.greeter__caption.is-you { color: var(--muted); }
+.greeter__hint {
+  margin: -10px 0 0;
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
 
 .why, .path {
   display: grid;
