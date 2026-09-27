@@ -21,16 +21,13 @@ import './interview.css';
 
 type Phase = 'brief' | 'live' | 'done';
 
-/** How long a finished answer waits before it sends, so the candidate can keep going. */
-const GRACE_MS = 2500;
-
 /**
- * The mock interview room: a live, two-way voice call with a Gemini
+ * The mock interview room: a live, two-way voice conversation with a Gemini
  * interviewer, with the candidate's camera on as a self-view. The interviewer
- * asks each question out loud; when the candidate stops talking, what they said
- * is shown and sent after a short grace period, and the next question follows.
- * Speaking again or "Wait, I'm not done" holds it. The critique of each answer
- * builds up underneath, and the readout comes at the end.
+ * runs it like a person would: asks a question, listens, notices when the
+ * candidate has finished, and moves on; the candidate can interrupt or ask for
+ * a repeat. The screen follows along, and each answer is critiqued in the
+ * background for the readout at the end.
  */
 export function InterviewRoom({ jobId }: { jobId: string }) {
   const [session, setSession] = useState<InterviewSessionPayload | null>(null);
@@ -38,53 +35,89 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
   const [phase, setPhase] = useState<Phase>('brief');
   const [index, setIndex] = useState(0);
 
-  const [said, setSaidState] = useState('');
-  const [answers, setAnswers] = useState<InterviewAnswer[]>([]);
-  const [critiques, setCritiques] = useState<AnswerCritique[]>([]);
   const [feedback, setFeedback] = useState<InterviewFeedback | null>(null);
 
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  /** When a finished answer sends by itself (Date.now()), or null. */
-  const [autoSendAt, setAutoSendAt] = useState<number | null>(null);
-  const [clock, setClock] = useState(0);
+  // Answers arrive from the call as the interviewer moves on. Each is critiqued
+  // in the background; the readout waits for all of them.
+  const answersRef = useRef<InterviewAnswer[]>([]);
+  const pendingRef = useRef<Promise<void>>(Promise.resolve());
 
-  // What the candidate said is read from timers and socket callbacks, so it lives in a ref too.
-  const saidRef = useRef('');
-  const setSaid = useCallback((value: string) => {
-    saidRef.current = value;
-    setSaidState(value);
-  }, []);
-  const scheduledAtRef = useRef(0);
-
-  const scheduleAutoSend = useCallback(() => {
-    if (!saidRef.current.trim()) return;
-    scheduledAtRef.current = performance.now();
-    setAutoSendAt(Date.now() + GRACE_MS);
-    setClock(Date.now());
-    setNotice('Got it. Your answer sends in a moment; keep talking to add more.');
-  }, []);
-
-  const onHeard = useCallback(
-    (text: string, finished: boolean) => {
-      if (text) {
-        setSaid((saidRef.current + text).replace(/^\s+/, ''));
-        // Still talking: whatever was about to send waits for the end of this.
-        if (!finished) setAutoSendAt(null);
+  const onQuestion = useCallback((next: number) => setIndex(next), []);
+  const finish = useCallback(async () => {
+    if (!session) return;
+    setBusy('Writing your readout.');
+    // Every answer's critique first, so the readout covers them all.
+    await pendingRef.current;
+    try {
+      const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/finish`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sessionId: session.sessionId, answers: answersRef.current }),
+      });
+      const payload = (await response.json()) as { feedback?: InterviewFeedback; error?: string };
+      if (!response.ok || !payload.feedback) {
+        setNotice(payload.error ?? `The readout could not be written (${response.status}).`);
+        return;
       }
-      if (finished) scheduleAutoSend();
+      setFeedback(payload.feedback);
+      setPhase('done');
+    } catch (error) {
+      setNotice((error as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }, [jobId, session]);
+
+  /** One answer, as the call reported it: critiqued and logged in the background. */
+  const submit = useCallback(
+    (questionIndex: number, text: string, seconds: number) => {
+      const target = session?.questions[questionIndex];
+      if (!session || !target || answersRef.current.some((answer) => answer.questionId === target.id)) return;
+      const answer: InterviewAnswer = {
+        questionId: target.id,
+        text,
+        source: 'spoken',
+        spokenSeconds: text && seconds > 0 ? seconds : null,
+      };
+      answersRef.current = [...answersRef.current, answer];
+      pendingRef.current = pendingRef.current.then(async () => {
+        try {
+          const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/turn`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: session.sessionId,
+              questionId: target.id,
+              text,
+              source: answer.source,
+              spokenSeconds: answer.spokenSeconds ?? undefined,
+            }),
+          });
+          if (!response.ok) console.warn('[interview] answer was not saved', response.status);
+        } catch (error) {
+          console.warn('[interview] answer was not saved', (error as Error).message);
+        }
+      });
     },
-    [scheduleAutoSend, setSaid],
+    [jobId, session],
   );
-  const liveCall = useLiveInterviewer(jobId, session?.sessionId ?? '', { onHeard, onNotice: setNotice });
+
+  const onFinished = useCallback(() => void finish(), [finish]);
+  const liveCall = useLiveInterviewer(jobId, session?.sessionId ?? '', {
+    onQuestion,
+    onAnswer: submit,
+    onFinished,
+    onNotice: setNotice,
+  });
   const liveOn = liveCall.status === 'live' || liveCall.status === 'connecting';
 
   const preparedRef = useRef<InterviewSessionPayload | null | undefined>(undefined);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
-  const sendRef = useRef<(skip: boolean) => Promise<void>>(async () => {});
 
   /* ------------------------------------------------------------- the session */
 
@@ -173,125 +206,18 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
 
   const question: InterviewQuestion | null = session?.questions[index] ?? null;
 
-  const finish = useCallback(
-    async (allAnswers: InterviewAnswer[]) => {
-      if (!session) return;
-      setBusy('Writing your readout.');
-      try {
-        const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/finish`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ sessionId: session.sessionId, answers: allAnswers }),
-        });
-        const payload = (await response.json()) as { feedback?: InterviewFeedback; error?: string };
-        if (!response.ok || !payload.feedback) {
-          setNotice(payload.error ?? `The readout could not be written (${response.status}).`);
-          return;
-        }
-        setFeedback(payload.feedback);
-        setPhase('done');
-      } catch (error) {
-        setNotice((error as Error).message);
-      } finally {
-        setBusy(null);
-      }
-    },
-    [jobId, session],
-  );
-
-  const send = useCallback(
-    async (skip: boolean) => {
-      if (!session || !question) return;
-      setAutoSendAt(null);
-      const text = skip ? '' : saidRef.current.trim();
-      if (!skip && !text) {
-        setNotice('Nothing heard yet. Answer out loud and it appears here.');
-        return;
-      }
-
-      setBusy(skip ? 'Skipping.' : 'Sending your answer.');
-      const seconds = liveCall.takeSpeechSeconds();
-      const answer: InterviewAnswer = {
-        questionId: question.id,
-        text,
-        source: 'spoken',
-        spokenSeconds: skip || seconds <= 0 ? null : seconds,
-      };
-
-      try {
-        const response = await authedFetch(`/api/interview/${encodeURIComponent(jobId)}/turn`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: session.sessionId,
-            questionId: question.id,
-            text,
-            source: answer.source,
-            spokenSeconds: answer.spokenSeconds ?? undefined,
-          }),
-        });
-        const payload = (await response.json()) as { critique?: AnswerCritique; error?: string };
-        if (!response.ok || !payload.critique) {
-          setNotice(payload.error ?? `That answer did not send (${response.status}).`);
-          return;
-        }
-        const allAnswers = [...answers, answer];
-        setAnswers(allAnswers);
-        setCritiques((previous) => [...previous, payload.critique as AnswerCritique]);
-        setSaid('');
-        setNotice(null);
-        setIndex((previous) => previous + 1);
-        const last = index + 1 >= session.questions.length;
-        // The room owns the order: the interviewer is told what comes next.
-        if (liveCall.status === 'live') {
-          if (last) liveCall.end();
-          else liveCall.ask(index + 1);
-        }
-        if (last) await finish(allAnswers);
-      } catch (error) {
-        setNotice((error as Error).message);
-      } finally {
-        setBusy((current) => (current === 'Writing your readout.' ? current : null));
-      }
-    },
-    [answers, finish, index, jobId, liveCall, question, session, setSaid],
-  );
-
-  useEffect(() => {
-    sendRef.current = send;
-  }, [send]);
-
-  // A finished answer sends itself after the grace period, unless the candidate
-  // started talking again in the meantime. Only stable values are dependencies,
-  // so the countdown's own re-renders do not restart the timer.
-  const lastVoiceAt = liveCall.lastVoiceAt;
-  useEffect(() => {
-    if (autoSendAt === null) return;
-    const tick = window.setInterval(() => setClock(Date.now()), 250);
-    const fire = window.setTimeout(
-      () => {
-        const voice = lastVoiceAt();
-        if (voice !== null && voice > scheduledAtRef.current + 300) {
-          setAutoSendAt(null);
-          setNotice('Still listening.');
-          return;
-        }
-        void sendRef.current(false);
-      },
-      Math.max(0, autoSendAt - Date.now()),
-    );
-    return () => {
-      window.clearInterval(tick);
-      window.clearTimeout(fire);
-    };
-  }, [autoSendAt, lastVoiceAt]);
-
   const startInterview = useCallback(() => {
     if (!session?.liveReady) return;
     setPhase('live');
     // Started from the click, so the browser lets the call open the microphone and play audio.
     void liveCall.start(0);
   }, [liveCall, session]);
+
+  /** Ends early: the interviewer says goodbye, and the readout covers what was answered. */
+  const endInterview = useCallback(() => {
+    if (liveCall.status === 'live') liveCall.end();
+    else void finish();
+  }, [finish, liveCall]);
 
   /* -------------------------------------------------------------- rendering */
 
@@ -357,8 +283,7 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
     );
   }
 
-  const secondsLeft = autoSendAt === null ? 0 : Math.max(0, Math.ceil((autoSendAt - clock) / 1000));
-  const callDown = phase === 'live' && !liveOn;
+  const callDown = phase === 'live' && !liveOn && !busy;
 
   return (
     <>
@@ -439,69 +364,22 @@ export function InterviewRoom({ jobId }: { jobId: string }) {
                   ) : null}
                 </div>
 
-                <h3 className="iv-label" id="iv-said-heading">
-                  What you said
-                </h3>
-                <div className="iv-said" role="log" aria-labelledby="iv-said-heading" aria-live="polite">
-                  {said ? (
-                    <p>{said}</p>
-                  ) : (
-                    <p className="iv-muted">
-                      {liveCall.status === 'live' ? 'Answer out loud. Your words appear here when you pause.' : ''}
-                    </p>
-                  )}
-                </div>
-
                 <div className="iv-actions">
                   {callDown ? (
-                    <button
-                      type="button"
-                      className="ws-button"
-                      onClick={() => {
-                        liveCall.takeSpeechSeconds();
-                        void liveCall.start(index);
-                      }}
-                    >
+                    <button type="button" className="ws-button" onClick={() => void liveCall.start(index)}>
                       Call the interviewer back
                     </button>
                   ) : null}
-                  {autoSendAt !== null ? (
-                    <>
-                      <button type="button" className="ws-button" disabled={busy !== null} onClick={() => void send(false)}>
-                        Send now <span aria-hidden="true">· {secondsLeft}</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="ws-button ws-button--quiet"
-                        onClick={() => {
-                          setAutoSendAt(null);
-                          setNotice('Held. Keep going, then send when you are ready.');
-                        }}
-                      >
-                        Wait, I&apos;m not done
-                      </button>
-                    </>
-                  ) : said.trim() ? (
-                    <button type="button" className="ws-button" disabled={busy !== null} onClick={() => void send(false)}>
-                      Send answer
-                    </button>
-                  ) : null}
                   {liveCall.status === 'live' ? (
-                    <button type="button" className="ws-button ws-button--quiet" onClick={() => liveCall.repeat(index)}>
-                      Ask it again
+                    <button type="button" className="ws-button ws-button--quiet" onClick={liveCall.skip}>
+                      Skip this one
                     </button>
                   ) : null}
-                  <button
-                    type="button"
-                    className="ws-button ws-button--quiet"
-                    disabled={busy !== null}
-                    onClick={() => void send(true)}
-                  >
-                    Skip this one
+                  <button type="button" className="ws-button ws-button--quiet" disabled={busy !== null} onClick={endInterview}>
+                    End the interview
                   </button>
                 </div>
 
-                {critiques.length ? <CritiqueList critiques={critiques} questions={session.questions} /> : null}
               </>
             ) : null}
 
@@ -517,9 +395,9 @@ function Brief({ session, onStart }: { session: InterviewSessionPayload; onStart
   return (
     <>
       <p>
-        {session.questions.length} questions, one at a time, on a live voice call. The interviewer asks each one out
-        loud; answer out loud, and when you stop talking your answer is sent and the next question comes. Skipping
-        shows up in the readout.
+        {session.questions.length} questions on a live voice call. The interviewer asks each one out loud and listens,
+        and moves on when you have finished. Talk to them as you would in a real interview: you can interrupt, ask them
+        to repeat a question, or say you want to skip it.
       </p>
       <p className="iv-muted">{QUESTION_SOURCE_LABEL[session.questionSource]}.</p>
 

@@ -9,12 +9,11 @@ import type { InterviewLiveTicket } from '@/lib/interview-contract';
  * A live, two-way voice call with the interviewer: the microphone streams to
  * the relay (services/interview-live), which runs Gemini Live on Vertex, and
  * the interviewer's voice streams back. The candidate can talk over the
- * interviewer and it stops. What the candidate says comes back as text for the
- * answer box.
+ * interviewer and it stops.
  *
- * The room still owns the question order: it tells the call which question is
- * next with `ask`, and the relay only lets through what the interviewer says
- * when directed, so the voice never drifts from the screen.
+ * The interviewer runs the conversation and keeps the room in step: the relay
+ * reports each question it moves to, what the candidate said to the previous
+ * one, and the end of the interview.
  */
 
 export type LiveStatus = 'idle' | 'connecting' | 'live' | 'ended' | 'failed';
@@ -38,16 +37,20 @@ registerProcessor('capture', Capture);
 `;
 
 type Handlers = {
+  /** The interviewer moved to this question (0-based). */
+  onQuestion: (index: number) => void;
   /**
-   * What the candidate said, as the relay transcribes it. `finished` is set when
-   * Gemini decides they have stopped talking: the end of their answer.
+   * What the candidate said to a question, once the interviewer moved past it,
+   * and how long they spoke for (first to last moment of voice), for pacing.
    */
-  onHeard: (text: string, finished: boolean) => void;
+  onAnswer: (index: number, text: string, spokenSeconds: number) => void;
+  /** The interviewer ended the interview. */
+  onFinished: () => void;
   /** A status sentence for the room's live region. */
   onNotice: (text: string | null) => void;
 };
 
-export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, onNotice }: Handlers) {
+export function useLiveInterviewer(jobId: string, sessionId: string, handlerProps: Handlers) {
   const [status, setStatus] = useState<LiveStatus>('idle');
   const [speaking, setSpeaking] = useState(false);
 
@@ -81,10 +84,10 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
     firstVoice: null,
     lastVoice: null,
   });
-  const handlers = useRef({ onHeard, onNotice });
+  const handlers = useRef(handlerProps);
   useEffect(() => {
-    handlers.current = { onHeard, onNotice };
-  }, [onHeard, onNotice]);
+    handlers.current = handlerProps;
+  });
 
   const silence = useCallback(() => {
     const state = live.current;
@@ -213,12 +216,21 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
         ws.onopen = () => ws.send(JSON.stringify({ type: 'start', ticket: pass.ticket, index }));
         ws.onmessage = (event: MessageEvent<ArrayBuffer | string>) => {
           if (typeof event.data !== 'string') return play(event.data);
-          const message = JSON.parse(event.data) as { type: string; text?: string; finished?: boolean; message?: string };
+          const message = JSON.parse(event.data) as { type: string; index?: number; text?: string; message?: string };
           if (message.type === 'ready') {
             setStatus('live');
-            handlers.current.onNotice('The interviewer is on the line. Answer out loud; your words appear in the answer box.');
-          } else if (message.type === 'heard') {
-            handlers.current.onHeard(message.text ?? '', !!message.finished);
+            handlers.current.onNotice(null);
+          } else if (message.type === 'question' && typeof message.index === 'number') {
+            handlers.current.onQuestion(message.index);
+          } else if (message.type === 'answer' && typeof message.index === 'number') {
+            const state = live.current;
+            const span =
+              state.firstVoice !== null && state.lastVoice !== null ? (state.lastVoice - state.firstVoice) / 1000 : 0;
+            state.firstVoice = null;
+            state.lastVoice = null;
+            handlers.current.onAnswer(message.index, message.text ?? '', span);
+          } else if (message.type === 'finished') {
+            handlers.current.onFinished();
           } else if (message.type === 'interrupted') {
             silence();
           } else if (message.type === 'error' && message.message) {
@@ -253,8 +265,7 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message));
   }, []);
 
-  const ask = useCallback((index: number) => sendMessage({ type: 'ask', index }), [sendMessage]);
-  const repeat = useCallback((index: number) => sendMessage({ type: 'repeat', index }), [sendMessage]);
+  const skip = useCallback(() => sendMessage({ type: 'skip' }), [sendMessage]);
   const end = useCallback(() => {
     sendMessage({ type: 'end' });
     // The goodbye plays, then the relay closes the call.
@@ -263,18 +274,6 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
     teardown();
     setStatus('ended');
   }, [teardown]);
-
-  /** Seconds from the first to the last moment of voice since the last call, then resets. */
-  const takeSpeechSeconds = useCallback((): number => {
-    const state = live.current;
-    const span = state.firstVoice !== null && state.lastVoice !== null ? (state.lastVoice - state.firstVoice) / 1000 : 0;
-    state.firstVoice = null;
-    state.lastVoice = null;
-    return span;
-  }, []);
-
-  /** When the microphone last heard a voice (performance.now()), or null. */
-  const lastVoiceAt = useCallback((): number | null => live.current.lastVoice, []);
 
   /** The interviewer's output spectrum, for the wave. Empty when not connected. */
   const levels = useCallback((): Uint8Array => {
@@ -301,7 +300,7 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
     };
   }, [teardown]);
 
-  return { status, speaking, start, ask, repeat, end, stop, levels, takeSpeechSeconds, lastVoiceAt };
+  return { status, speaking, start, skip, end, stop, levels };
 }
 
 /** Columns and rows of the pixel wave. */

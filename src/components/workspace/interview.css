@@ -133,6 +133,3 @@
 .iv-wave { display: block; width: 100%; height: auto; color: var(--ink); image-rendering: pixelated; margin: 4px 0 10px; }
 .iv-voice-button { margin-top: 10px; }
 
-/* What the candidate said, as the call transcribes it. Read-only: answers are spoken. */
-.iv-said { min-height: 7.5em; padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: 12px; font-size: 17px; line-height: 1.6; }
-.iv-said p { margin: 0; }
