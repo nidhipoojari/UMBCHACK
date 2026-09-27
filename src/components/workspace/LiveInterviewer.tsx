@@ -232,7 +232,7 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
         };
         ws.onerror = () => {
           setStatus('failed');
-          handlers.current.onNotice('The live interviewer could not connect. The questions are on screen, and typing still works.');
+          handlers.current.onNotice('The live interviewer could not connect. Try calling them back.');
         };
       } catch (error) {
         teardown();
@@ -240,7 +240,7 @@ export function useLiveInterviewer(jobId: string, sessionId: string, { onHeard, 
         const name = (error as DOMException).name;
         handlers.current.onNotice(
           name === 'NotAllowedError'
-            ? 'The browser blocked the microphone, so the live interviewer cannot hear you. Typing still works.'
+            ? 'The browser blocked the microphone, so the interviewer cannot hear you. Allow it in the address bar, then call them back.'
             : (error as Error).message,
         );
       }

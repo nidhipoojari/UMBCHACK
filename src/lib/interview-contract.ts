@@ -60,8 +60,9 @@ export const QUESTION_SOURCE_LABEL: Record<QuestionSource, string> = {
 };
 
 /**
- * How an answer arrived. A transcribed answer can have a misheard word, so the
- * critique never comments on its wording, only its structure and pace.
+ * How an answer arrived. Answers in the room are spoken; a transcribed answer
+ * can have a misheard word, so the critique never comments on its wording,
+ * only its structure and pace.
  */
 export const ANSWER_SOURCES = ['typed', 'spoken'] as const;
 export type AnswerSource = (typeof ANSWER_SOURCES)[number];
@@ -105,10 +106,6 @@ export type InterviewSessionPayload = {
   questionSource: QuestionSource;
   /** Non-fatal sentences about anything that fell back. */
   degraded: string[];
-  /** Whether POST .../speak can read questions aloud. */
-  voiceReady: boolean;
-  /** Whether POST .../transcribe can turn a recording into text. */
-  sttReady: boolean;
   /** Whether a live, two-way call with the interviewer can be opened. */
   liveReady: boolean;
 };
