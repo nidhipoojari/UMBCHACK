@@ -80,7 +80,7 @@ Two rules shaped every decision:
 | 🎙️ **Voice routes** | ElevenLabs Scribe v2 (speech-to-text) and Flash v2.5 (text-to-speech) behind sign-in and a per-user rate limit. Used by the gap interview; the open-ended hands-free loop (`useVoiceAgent`) is not mounted yet. | ✅ |
 | 💬 **Chat drawer** | The right-hand transcript panel on every workspace page. | 🚧 seeded conversation, canned reply |
 | 🧑‍💼 **Employer workspace** | The applicant mailbox is real. The overview, candidate search and activity feed are sample layouts. | 🟡 |
-| 🌌 **Landing page** | A WebGL star field, an 11-beat scroll story, a cost ledger, a fraud gate and a handshake explainer. Respects `prefers-reduced-motion` throughout. | ✅ |
+| 🌌 **Landing page** | A WebGL star field, a 13-beat scroll story (including two "Built for students" beats on the alumni network and the game layer), a cost ledger, a fraud gate and a handshake explainer. Respects `prefers-reduced-motion` throughout. | ✅ |
 
 ---
 
@@ -436,6 +436,8 @@ Keeping ourselves honest:
 - **No number guard yet.** The system prompt forbids invented numbers, but nothing checks the reply against the tool results. That check is planned.
 - **Employer overview, candidates and both activity feeds are sample layouts.**
 - **Rate limiting is per instance.** It is an in-memory courtesy throttle, not a global limit.
+- **The landing page's gate list and handshake copy name ANS and certificates.** The gateway actually uses `agent://` names in its own registry and signatures checked against pinned P-256 keys, not ANS or X.509. The copy should say what the code does.
+- **The landing page fails without WebGL, and under reduced motion.** A browser with no WebGL context throws from the three.js star field and face instead of falling back, and with `prefers-reduced-motion` on, `ArchitectureRail` renders a different tree on the client than on the server, so hydration fails.
 - **Some docs are behind the code.** `functions/README.md` doesn't mention `profile-pipeline` or `ats-worker`, and `functions/job-scanner/README.md` still describes the earlier Databricks setup.
 
 ---
@@ -445,6 +447,7 @@ Keeping ourselves honest:
 | When (EDT) | What changed |
 |---|---|
 | Sun Sep 27, ~04:15 | Coursework twin: every applicant matched once to a unique hackUMBC dataset student during resume processing, a Coursework card on Profile, and coursework counted as partial evidence in the gap interview's re-ranking (`coursework_twins`, `009`); apply moved into agent missions |
+| Sun Sep 27, ~03:35 | Landing page speaks to students: two new "Built for students" beats in How it works (alumni network, streaks and XP), student card and feature marquee updated, coursework matching and unbuilt features (mock interviews, live analytics) taken out of the copy |
 | Sun Sep 27, ~02:45 | Gap interview on the Jobs page (spoken or typed, capped re-scoring of affected matches); alumni network and Agents tab revamped as missions with a secure agent line; avatar initials back in Forum |
 | Sun Sep 27, ~02:00 | Voice agent: Gemini tool loop, ElevenLabs STT/TTS routes, tap-to-hear saved intro on the landing page; Forum across every page and form field; this README |
 | Sun Sep 27, ~01:30 | Pipeline board, job page, toolbox with fact gate, autofill worker; employer apply + mailbox via the gateway; game layer (energy, streak, XP, levels) |

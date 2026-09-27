@@ -126,10 +126,11 @@ jobs:
             --project "$FIREBASE_PROJECT" --non-interactive
 
       # Firebase creates a fresh SSR revision and currently preserves the
-      # secret volume but drops the environment variable that points our code
-      # at its file. Restore both after every live deploy so Approve & send
-      # cannot silently become disabled on the next release.
-      - name: Restore applicant agent signing key
+      # secret volume but drops the environment variables that point our code
+      # at the key and private employer gateway. Restore all of them after every
+      # live deploy so Approve & send cannot silently become disabled or dial a
+      # stale gateway on the next release.
+      - name: Restore applicant agent runtime configuration
         if: github.event_name != 'pull_request'
         run: |
           service=ssrproject96b6d773106a4
@@ -144,7 +145,7 @@ jobs:
           gcloud run services update ssrproject96b6d773106a4 \
             --project "$FIREBASE_PROJECT" --region us-east1 \
             --update-secrets=/secrets/a2a/a2a-applicant-agent-key=a2a-applicant-agent-key:latest \
-            --update-env-vars=A2A_APPLICANT_KEY_FILE=/secrets/a2a/a2a-applicant-agent-key \
+            --update-env-vars=A2A_APPLICANT_KEY_FILE=/secrets/a2a/a2a-applicant-agent-key,A2A_EMPLOYER_GATEWAY_URL=https://agent-gateway-nsw4gvibpq-ue.a.run.app \
             --quiet
 
           signed_revision="$(gcloud run services describe "$service" \
