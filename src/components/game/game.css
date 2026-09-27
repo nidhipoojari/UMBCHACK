@@ -8,7 +8,9 @@
    verified-badges.css itself; the HUD does the same. It also means the dev
    harness under /dev renders the real thing rather than an approximation.
 
-   NO NEW PALETTE. Every colour below is var(--ink) on var(--paper), mixed.
+   Most status remains ink on paper; the streak is the deliberate exception.
+   Its orange is celebratory rather than semantic, and the count plus label
+   continue to carry the meaning without relying on colour.
    The app's tokens deliberately define --success, --failure and --accent as
    the same ink, because meaning that lives in a hue is meaning that some
    readers do not get. An energy meter is exactly the kind of thing that
@@ -176,14 +178,24 @@
    contract is what makes this possible: rendering 0 at 9am would punish
    someone for not having acted yet. */
 .g-streak-mark {
+  position: relative;
   display: inline-grid;
   place-items: center;
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  border: 2px solid var(--ink, currentColor);
+  border: 2px solid #f58a1f;
+  color: #f36d18;
+  background: radial-gradient(circle at 45% 70%, #fff5bf 0 22%, #ffd15c 45%, #ff9a2e 74%, #f06a1b 100%);
+  box-shadow: 0 8px 22px rgb(242 112 27 / 24%), inset 0 1px 0 rgb(255 255 255 / 68%);
   flex: none;
 }
+.g-flame { fill: #fff1a6; stroke: #d84a11; filter: drop-shadow(0 2px 3px rgb(169 53 8 / 28%)); }
+.g-spark { position: absolute; width: 5px; height: 5px; border-radius: 50%; background: #ffad27; opacity: 0; pointer-events: none; }
+.g-spark-one { left: 4px; top: 5px; }
+.g-spark-two { right: 2px; top: 10px; }
+.g-spark-three { right: 9px; bottom: 1px; }
+.g-streak { background: linear-gradient(145deg, color-mix(in srgb, #fff2c4 52%, var(--card)), color-mix(in srgb, #ffcf8a 16%, var(--card))); border-color: color-mix(in srgb, #f28a25 32%, var(--line)); }
 .g-streak.is-at-risk .g-streak-mark {
   border-style: dashed;
   opacity: 0.7;
@@ -214,6 +226,16 @@
 .g-streak.is-extended .g-flame {
   animation: g-flicker 720ms ease-in-out;
 }
+.g-streak.is-extended .g-spark { animation: g-spark-burst 720ms ease-out; }
+.g-streak.is-extended .g-spark-two { animation-delay: 70ms; }
+.g-streak.is-extended .g-spark-three { animation-delay: 130ms; }
+@keyframes g-spark-burst {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  28% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--spark-x, -9px), -18px) scale(1.4); }
+}
+.g-spark-two { --spark-x: 12px; }
+.g-spark-three { --spark-x: 8px; }
 @keyframes g-flicker {
   0%,
   100% {
@@ -510,6 +532,7 @@
   .g-streak.is-extended .g-flame {
     animation: none;
   }
+  .g-streak.is-extended .g-spark { animation: none; }
   .g-bar > .g-fill {
     transition: none;
   }

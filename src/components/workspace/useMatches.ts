@@ -9,7 +9,8 @@ const POLL_MS = 3000;
 
 /**
  * The applicant's job matches. Polls while match-jobs is still running, so a
- * dashboard opened straight after onboarding fills in by itself.
+ * dashboard opened straight after onboarding fills in by itself, and reloads
+ * when the gap interview re-scores them.
  */
 export function useMatches(): { data: MatchesResponse | null; error: string | null } {
   const [data, setData] = useState<MatchesResponse | null>(null);
@@ -39,9 +40,16 @@ export function useMatches(): { data: MatchesResponse | null; error: string | nu
     }
 
     load();
+    // The gap interview re-scores the matches in place; reload when it says so.
+    const reload = () => {
+      window.clearTimeout(timer);
+      void load();
+    };
+    window.addEventListener('agenthire:matches-changed', reload);
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      window.removeEventListener('agenthire:matches-changed', reload);
     };
   }, []);
 

@@ -1,3 +1,4 @@
+import { CourseworkCard } from '@/components/workspace/CourseworkCard';
 import { PageHead } from '@/components/workspace/PageHead';
 import { ProfileFacts } from '@/components/workspace/ProfileFacts';
 
@@ -12,6 +13,7 @@ export default function ProfilePage() {
         Built from your resume. The details below are what we have on file.
       </PageHead>
       <ProfileFacts role="applicant" />
+      <CourseworkCard />
       <section className="ws-section" aria-labelledby="skills-h">
         <header>
           <h2 id="skills-h">Skills</h2>

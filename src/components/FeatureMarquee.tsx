@@ -1,15 +1,16 @@
 const FEATURES = [
   'Voice-first applications',
   'Verified employers, or we refuse',
-  'Matched on skills and coursework',
+  'Alumni network by major',
   'Agent-to-agent apply',
   'Auto-tailored resume and cover letter',
+  'Streaks, XP and levels',
   'Domain-anchored identity',
+  'One-tap company missions',
   'Screen-reader and keyboard native',
   'Human approval before anything sends',
-  'Live application analytics',
+  'Real outcomes from your campus',
   'Skill-gap insight',
-  'Voice mock interviews',
   'Every handshake audit-logged',
 ];
 

@@ -10,7 +10,7 @@ import { AgentFace } from './AgentFace';
  * The art for each beat of the architecture rail.
  *
  * These were photographs, and the photographs were shot dark — which on a navy
- * band read as eleven black rectangles. They are diagrams now: line drawings in
+ * band read as a row of black rectangles. They are diagrams now: line drawings in
  * `currentColor` on paper, animated, each one showing the thing its caption
  * says rather than illustrating a mood.
  *
@@ -20,8 +20,8 @@ import { AgentFace } from './AgentFace';
  *    the animation is additive. Drop the animation — off screen, or under
  *    prefers-reduced-motion — and what is left is a correct still diagram, not
  *    an empty frame.
- * 2. Nothing animates off screen. `useInView` gates the whole card, so eleven
- *    looping SVGs cost one card's worth of work, not eleven.
+ * 2. Nothing animates off screen. `useInView` gates the whole card, so a dozen
+ *    looping SVGs cost one card's worth of work, not a dozen.
  * 3. `aria-hidden`, always. The caption beside the card already carries the
  *    meaning in text; a screen reader should not meet the drawing twice.
  */
@@ -304,7 +304,159 @@ function Match({ still }: ArtProps) {
   );
 }
 
-/* --- 08 · five dimensions, each with a reason ---------------------------- */
+/* --- 08 · alumni who already walked the path ---------------------------- */
+
+/** Three graduates and the door each came through. The labels are the kinds of
+ *  `first_job_found_via` the network page shows, not figures from it. */
+const ALUMNI = [
+  { y: 44, route: 'RETURN OFFER' },
+  { y: 100, route: 'CAREER FAIR' },
+  { y: 156, route: 'REFERRAL' },
+];
+
+function Alumni({ still }: ArtProps) {
+  return (
+    <svg className="art" viewBox={BOX} aria-hidden="true">
+      {ALUMNI.map((a, i) => (
+        <g key={a.route}>
+          <path d={`M86 88 L176 ${a.y}`} stroke="currentColor" strokeOpacity={0.22} fill="none" />
+          <motion.path
+            d={`M86 88 L176 ${a.y}`}
+            stroke="currentColor"
+            strokeOpacity={0.7}
+            fill="none"
+            {...loop(
+              still,
+              { pathLength: [0, 1, 1, 0] },
+              { duration: 5.2, times: [0, 0.16, 0.9, 1], delay: i * 0.3 },
+            )}
+          />
+          <circle cx={186} cy={a.y} r={10} fill="none" stroke="currentColor" strokeOpacity={0.55} strokeWidth={1.4} />
+          <motion.circle
+            cx={186}
+            cy={a.y}
+            r={4}
+            fill="currentColor"
+            {...loop(
+              still,
+              { opacity: [0, 0, 1, 1, 0] },
+              { duration: 5.2, times: [0, 0.16, 0.24, 0.9, 1], delay: i * 0.3 },
+            )}
+          />
+          <text x={204} y={a.y + 3}>
+            {a.route}
+          </text>
+        </g>
+      ))}
+
+      {/* One introduction out to the middle graduate, and a reply back. */}
+      <motion.rect
+        x={81}
+        y={83}
+        width={10}
+        height={10}
+        fill="currentColor"
+        opacity={0}
+        {...loop(
+          still,
+          { x: [0, 0, 84, 84, 0], y: [0, 0, 10, 10, 0], opacity: [0, 1, 1, 1, 0] },
+          { duration: 5.2, times: [0, 0.4, 0.58, 0.7, 0.88] },
+        )}
+      />
+      <AgentNode x={58} y={88} label="YOUR AGENT" />
+    </svg>
+  );
+}
+
+/* --- 09 · streaks, XP and a level that has to be earned ----------------- */
+
+const XP_SEGMENTS = [0, 1, 2, 3, 4];
+const STREAK = [0, 1, 2, 3, 4, 5, 6];
+const STREAK_LIT = 3;
+
+function Progress({ still }: ArtProps) {
+  return (
+    <svg className="art" viewBox={BOX} aria-hidden="true">
+      {/* The level title turns over once the bar is full. */}
+      <motion.text
+        x={40}
+        y={48}
+        opacity={still ? 0 : 1}
+        {...loop(still, { opacity: [1, 1, 0, 0, 1] }, { duration: 6, times: [0, 0.58, 0.62, 0.96, 1] })}
+      >
+        LEVEL 1 · COLD OUTREACH
+      </motion.text>
+      <motion.text
+        x={40}
+        y={48}
+        opacity={still ? 1 : 0}
+        {...loop(still, { opacity: [0, 0, 1, 1, 0] }, { duration: 6, times: [0, 0.58, 0.62, 0.96, 1] })}
+      >
+        LEVEL 2 · MAKING CONTACT
+      </motion.text>
+
+      {/* Fifty XP to a level, ten for each person reached. */}
+      {XP_SEGMENTS.map((i) => (
+        <g key={i}>
+          <rect x={40 + i * 45} y={64} width={40} height={10} fill="currentColor" fillOpacity={0.12} />
+          <motion.rect
+            x={40 + i * 45}
+            y={64}
+            width={40}
+            height={10}
+            fill="currentColor"
+            fillOpacity={0.85}
+            style={fromLeft}
+            {...loop(
+              still,
+              { scaleX: [0, 0, 1, 1, 0] },
+              { duration: 6, times: [0, 0.08 + i * 0.1, 0.14 + i * 0.1, 0.94, 1] },
+            )}
+          />
+        </g>
+      ))}
+      <text x={260} y={92} textAnchor="end">
+        +10 XP PER PERSON
+      </text>
+
+      {/* A week of days; the first three kept. */}
+      {STREAK.map((d) => {
+        const lit = d < STREAK_LIT;
+        return (
+          <g key={d}>
+            <circle
+              cx={52 + d * 33}
+              cy={136}
+              r={9}
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={0.35}
+              strokeWidth={1.4}
+            />
+            {lit ? (
+              <motion.circle
+                cx={52 + d * 33}
+                cy={136}
+                r={5}
+                fill="currentColor"
+                style={fromCenter}
+                {...loop(still, { scale: [0, 1.25, 1, 1, 0] }, { duration: 6, times: [0, 0.1, 0.16, 0.94, 1], delay: d * 0.25 })}
+              />
+            ) : null}
+          </g>
+        );
+      })}
+      <text x={40} y={180}>
+        STREAK
+      </text>
+      <text x={260} y={180} textAnchor="end">
+        3 DAYS RUNNING
+      </text>
+    </svg>
+  );
+}
+
+/* --- 10 · five dimensions, each with a reason ---------------------------- */
 
 const TRUST = [
   { label: 'INTEGRITY', v: 0.88 },
@@ -357,7 +509,7 @@ function Trust({ still }: ArtProps) {
   );
 }
 
-/* --- 09 / 10 · one agent asks the other to prove it ---------------------- */
+/* --- 11 / 12 · one agent asks the other to prove it ---------------------- */
 
 function AgentNode({ x, y, label }: { x: number; y: number; label: string }) {
   return (
@@ -422,7 +574,7 @@ function Handshake({ still, reverse = false }: ArtProps & { reverse?: boolean })
   );
 }
 
-/* --- 11 · they keep talking; you decide once ---------------------------- */
+/* --- 13 · they keep talking; you decide once ---------------------------- */
 
 const VOLLEYS = [0, 1, 2, 3];
 
@@ -489,34 +641,36 @@ function Negotiation({ still }: ArtProps) {
 /* --- The switch ---------------------------------------------------------- */
 
 const ART: Record<string, (p: ArtProps) => React.ReactElement> = {
-  '01': Applications,
-  '02': Forms,
-  '03': Hours,
-  '04': Ghost,
-  '06': Voice,
-  '07': Match,
-  '08': Trust,
-  '09': Handshake,
-  '10': (p) => <Handshake {...p} reverse />,
-  '11': Negotiation,
+  applications: Applications,
+  forms: Forms,
+  hours: Hours,
+  ghost: Ghost,
+  voice: Voice,
+  match: Match,
+  alumni: Alumni,
+  progress: Progress,
+  trust: Trust,
+  handshake: Handshake,
+  'handshake-reverse': (p) => <Handshake {...p} reverse />,
+  negotiation: Negotiation,
 };
 
-export function StoryArt({ n }: { n: string }) {
+export function StoryArt({ art }: { art: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const reduced = useReducedMotion();
   const inView = useInView(ref, { amount: 0.3 });
   const still = Boolean(reduced) || !inView;
 
-  // 05 is the turn: at the moment the copy says we built it, show the agent
+  // 'face' is the turn: at the moment the copy says we built it, show the agent
   // itself rather than a diagram of one.
   //
   // The FLAT face, not AgentFaceLive. The 3D head is ~880 KB of three.js and
   // renders nothing at all where WebGL is unavailable — which is a bad bet on a
-  // borrowed machine at a demo, for a card that is one of eleven. The flat face
+  // borrowed machine at a demo, for a card that is one of thirteen. The flat face
   // is the same character in the same line-art idiom as the other ten drawings,
   // and it animates without a GPU. The 3D head still leads the hero and the
   // voice widget, where it earns its weight.
-  const Draw = ART[n];
+  const Draw = ART[art];
 
   return (
     <div className="stage__art" ref={ref}>

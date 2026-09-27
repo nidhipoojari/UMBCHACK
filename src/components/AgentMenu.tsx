@@ -2,7 +2,27 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Ban, Check, Fingerprint, KeyRound, Loader2, Radio, ScrollText, ShieldCheck } from 'lucide-react';
+import {
+  Ban,
+  Bot,
+  Building2,
+  Check,
+  ChevronRight,
+  Fingerprint,
+  Flame,
+  KeyRound,
+  Loader2,
+  LockKeyhole,
+  MessageCircle,
+  Network,
+  Radio,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  Sparkles,
+  Undo2,
+  Zap,
+} from 'lucide-react';
 
 import { firebaseAuth } from '@/lib/firebase';
 import { VerifiedBadges } from '@/components/VerifiedBadges';
@@ -100,9 +120,51 @@ type Payload = {
   feed: AuditEntry[];
 };
 
-async function authedFetch(url: string): Promise<Response> {
+type Match = {
+  job_id: string;
+  rank: number;
+  title: string | null;
+  company: string | null;
+  location: string | null;
+  url: string | null;
+  score: number;
+  reason: string | null;
+};
+
+type Attempt = {
+  jobId: string;
+  jti: string | null;
+  sentAt: string;
+  accepted: boolean;
+  reasons: string[];
+};
+
+type ApplyContext = {
+  missing: string[];
+  ourFingerprint: string | null;
+  employer: { agentName: string; fingerprint: string; revokedAt: string | null } | null;
+  matches: Match[];
+  sent: Attempt[];
+};
+
+type ApplyOutcome = {
+  ok: boolean;
+  error?: string;
+  accepted: boolean;
+  reasons: string[];
+  jti: string | null;
+  messageId: string | null;
+  ciphertextSha256: string | null;
+  employerAgent: string;
+  sealedTo: string | null;
+};
+
+async function authedFetch(url: string, init?: RequestInit): Promise<Response> {
   const token = await firebaseAuth.currentUser?.getIdToken();
-  return fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  return fetch(url, {
+    ...init,
+    headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
+  });
 }
 
 function when(value: string | null): string {
@@ -116,12 +178,20 @@ function when(value: string | null): string {
 }
 
 type Filter = 'all' | 'refused' | 'accepted';
+type View = 'line' | 'network' | 'safety';
 
 const FILTERS: readonly { key: Filter; label: string }[] = [
   { key: 'all', label: 'Everything' },
   { key: 'refused', label: 'Refused' },
   { key: 'accepted', label: 'Accepted' },
 ];
+
+function speaker(agentName: string | null): string {
+  if (!agentName) return 'Unknown caller';
+  const parsed = parseAgentName(agentName);
+  if (!parsed) return agentName;
+  return `${parsed.role.charAt(0).toUpperCase()}${parsed.role.slice(1)} agent`;
+}
 
 /**
  * One agent in the roster.
@@ -224,19 +294,138 @@ function AgentRow({ agent }: { agent: AgentCard }) {
   );
 }
 
+function MissionReceipt({ outcome }: { outcome: ApplyOutcome }) {
+  if (!outcome.ok) {
+    return (
+      <div className="mission-chat is-fault" role="status">
+        <p className="mission-bubble is-agent">I paused this introduction. Nothing was sent.</p>
+        <p className="mission-bubble is-employer">{outcome.error ?? 'The secure route was unavailable.'}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`mission-chat ${outcome.accepted ? 'is-accepted' : 'is-refused'}`} role="status">
+      <p className="mission-bubble is-agent">Application encrypted and delivered.</p>
+      <p className="mission-bubble is-employer">
+        {outcome.accepted
+          ? 'Received. Your introduction is now in the employer queue.'
+          : outcome.reasons[0] ?? 'I could not accept this introduction.'}
+      </p>
+      <details className="agent-proof">
+        <summary>
+          <LockKeyhole size={13} aria-hidden="true" /> Show crypto proof
+          <ChevronRight size={13} aria-hidden="true" />
+        </summary>
+        <div className="agent-proof-card">
+          <p><span>Envelope</span><code>{outcome.jti ?? 'not minted'}</code></p>
+          <p><span>Sealed to</span><code>{outcome.sealedTo ?? 'unavailable'}</code></p>
+          <p><span>Ciphertext digest</span><code>{outcome.ciphertextSha256 ?? 'not returned'}</code></p>
+          {outcome.messageId ? <p><span>Employer mailbox</span><code>message {outcome.messageId}</code></p> : null}
+          <small>The application body is never stored in this receipt.</small>
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function CompanyMission({
+  match,
+  index,
+  already,
+  skipped,
+  pending,
+  outcome,
+  selected,
+  onApply,
+  onSkip,
+  onSelect,
+}: {
+  match: Match;
+  index: number;
+  already: boolean;
+  skipped: boolean;
+  pending: boolean;
+  outcome?: ApplyOutcome;
+  selected: boolean;
+  onApply: () => void;
+  onSkip: () => void;
+  onSelect: () => void;
+}) {
+  const company = match.company?.trim() || 'Employer';
+  const fit = Math.round(match.score * 100);
+  const sent = already || outcome?.accepted === true;
+
+  return (
+    <article className={`company-mission mission-tone-${(index % 5) + 1}${skipped ? ' is-skipped' : ''}${sent ? ' is-sent' : ''}${selected ? ' is-selected' : ''}`}>
+      <div className="mission-topline">
+        <span className="mission-company-mark" aria-hidden="true">{company.charAt(0).toUpperCase()}</span>
+        <div>
+          <p className="mission-kicker">Company mission {index + 1}</p>
+          <h3>{company}</h3>
+        </div>
+        <strong className="mission-fit"><span>{fit}</span> fit</strong>
+      </div>
+
+      <div className="mission-role">
+        <Building2 size={16} aria-hidden="true" />
+        <div>
+          <strong>{match.title ?? 'Matched opportunity'}</strong>
+          <span>{match.location ?? 'Location flexible'}</span>
+        </div>
+      </div>
+      {match.reason ? <p className="mission-reason">{match.reason}</p> : null}
+
+      {outcome ? <MissionReceipt outcome={outcome} /> : null}
+
+      <div className="mission-actions">
+        <button
+          type="button"
+          className="mission-button is-primary"
+          disabled={pending || sent || skipped}
+          onClick={onApply}
+        >
+          {pending ? <><Loader2 size={15} className="spin" aria-hidden="true" /> Encrypting…</> : sent ? <><Check size={15} aria-hidden="true" /> Introduced</> : <><Send size={15} aria-hidden="true" /> Approve &amp; send</>}
+        </button>
+        <button type="button" className="mission-button is-quiet" disabled={pending || sent} onClick={onSkip}>
+          {skipped ? <><Undo2 size={14} aria-hidden="true" /> Bring back</> : 'Not for me'}
+        </button>
+        <button type="button" className="mission-button is-chat" aria-pressed={selected} onClick={onSelect}>
+          <MessageCircle size={14} aria-hidden="true" /> {selected ? 'Chat open' : 'Open chat'}
+        </button>
+      </div>
+    </article>
+  );
+}
+
 export function AgentMenu() {
   const [data, setData] = useState<Payload | null>(null);
+  const [applyContext, setApplyContext] = useState<ApplyContext | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
+  const [view, setView] = useState<View>('line');
   const [error, setError] = useState<string | null>(null);
+  const [missionError, setMissionError] = useState<string | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  const [outcomes, setOutcomes] = useState<Record<string, ApplyOutcome>>({});
+  const [skipped, setSkipped] = useState<Set<string>>(() => new Set());
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [matchPage, setMatchPage] = useState(0);
+  const [refreshingMatches, setRefreshingMatches] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
-    const response = await authedFetch('/api/a2a');
+    setMissionError(null);
+    const [response, applyResponse] = await Promise.all([
+      authedFetch('/api/a2a'),
+      authedFetch('/api/a2a/apply'),
+    ]);
     if (!response.ok) {
       setError('Could not load the agent roster.');
       return;
     }
     setData((await response.json()) as Payload);
+    if (applyResponse.ok) setApplyContext((await applyResponse.json()) as ApplyContext);
+    else setMissionError('Your company missions could not be loaded right now.');
   }, []);
 
   useEffect(() => {
@@ -258,11 +447,71 @@ export function AgentMenu() {
     };
   }, [load]);
 
+  const allMissions = useMemo(() => {
+    const companies = new Set<string>();
+    return (applyContext?.matches ?? []).filter((match) => {
+      const key = (match.company ?? match.job_id).trim().toLowerCase();
+      if (companies.has(key)) return false;
+      companies.add(key);
+      return true;
+    });
+  }, [applyContext]);
+  const missionPages = Math.max(1, Math.ceil(allMissions.length / 5));
+  const missions = useMemo(
+    () => allMissions.slice((matchPage % missionPages) * 5, (matchPage % missionPages) * 5 + 5),
+    [allMissions, matchPage, missionPages],
+  );
+
+  const refreshMatches = useCallback(async () => {
+    setRefreshingMatches(true);
+    try {
+      if (missionPages > 1) {
+        setMatchPage((page) => (page + 1) % missionPages);
+        setSelectedJobId(null);
+      } else {
+        await load();
+      }
+    } finally {
+      window.setTimeout(() => setRefreshingMatches(false), 420);
+    }
+  }, [load, missionPages]);
+
+  const selectedMission = missions.find((match) => match.job_id === selectedJobId) ?? missions[0] ?? null;
+  const selectedJtis = useMemo(
+    () => new Set(
+      (applyContext?.sent ?? [])
+        .filter((attempt) => attempt.jobId === selectedMission?.job_id && attempt.jti)
+        .map((attempt) => attempt.jti as string),
+    ),
+    [applyContext, selectedMission?.job_id],
+  );
   const feed = useMemo(() => {
-    if (!data) return [];
-    if (filter === 'all') return data.feed;
-    return data.feed.filter((entry) => entry.decision === filter);
-  }, [data, filter]);
+    if (!data || !selectedMission) return [];
+    const companyFeed = data.feed.filter((entry) => entry.jti && selectedJtis.has(entry.jti));
+    if (filter === 'all') return companyFeed;
+    return companyFeed.filter((entry) => entry.decision === filter);
+  }, [data, filter, selectedJtis, selectedMission]);
+
+  const apply = useCallback(async (jobId: string) => {
+    setSelectedJobId(jobId);
+    setView('line');
+    setPending(jobId);
+    setMissionError(null);
+    try {
+      const response = await authedFetch('/api/a2a/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId }),
+      });
+      const outcome = (await response.json()) as ApplyOutcome;
+      setOutcomes((current) => ({ ...current, [jobId]: outcome }));
+      await load();
+    } catch {
+      setMissionError('The secure introduction could not be completed. Nothing new was sent.');
+    } finally {
+      setPending(null);
+    }
+  }, [load]);
 
   if (error && !data)
     return (
@@ -281,73 +530,125 @@ export function AgentMenu() {
 
   const { self, registered, alumni, unregistered, trail, defences, rank } = data;
   const pct = Math.round((rank.seen / Math.max(rank.total, 1)) * 100);
+  const ready = Boolean(
+    applyContext &&
+    applyContext.missing.length === 0 &&
+    applyContext.ourFingerprint &&
+    applyContext.employer &&
+    !applyContext.employer.revokedAt,
+  );
+  const introduced = missions.filter((match) =>
+    applyContext?.sent.some((attempt) => attempt.jobId === match.job_id && attempt.accepted) ||
+    outcomes[match.job_id]?.accepted,
+  ).length;
+  const questPct = Math.round((introduced / Math.max(missions.length, 1)) * 100);
 
   return (
     <>
-      <section className="ws-section" aria-labelledby="rank-h">
-        <header>
-          <h2 id="rank-h">
-            <ShieldCheck size={16} aria-hidden="true" /> {rank.title}
-          </h2>
-          <span className="muted">
-            {rank.seen} of {rank.total} checks have fired
-          </span>
-        </header>
-
-        <div
-          className="a2a-bar"
-          role="progressbar"
-          aria-valuenow={rank.seen}
-          aria-valuemin={0}
-          aria-valuemax={rank.total}
-          aria-label={`${rank.seen} of ${rank.total} gateway checks have refused at least one envelope`}
-        >
-          <span style={{ width: `${pct}%` }} />
+      <section className="agent-console" aria-labelledby="secure-line-h">
+        <div className="agent-console-glow" aria-hidden="true" />
+        <div className="agent-console-copy">
+          <span className={`agent-live${ready ? '' : ' is-paused'}`}><span /> {ready ? 'your agent is ready' : 'your agent needs one check'}</span>
+          <h2 id="secure-line-h">Today&rsquo;s opportunity quest</h2>
+          <p>Choose the companies worth your time. Your agent handles the secure introduction and brings the receipt back here.</p>
+          <div className="agent-quest-progress"><span style={{ width: `${questPct}%` }} /></div>
+          <small>{introduced} of {missions.length || 5} introductions complete</small>
         </div>
-        {/* Cut from three sentences to a clause. The argument — that this bar
-            is derived from real refusals and cannot be moved by using the app
-            — is made far better by the board below, where a check that has
-            never fired sits visibly at zero. The unclassified count stays
-            because it is a number, and nothing else on the page reports it. */}
-        <p className="muted a2a-hint">
-          From refusal reasons in <code>a2a_audit</code>, never a score column.
-          {rank.unclassified > 0 ? ` ${rank.unclassified} unmatched.` : ''}
-        </p>
-
-        <ul className="ws-stats a2a-stats">
-          <li>
-            <span>Envelopes audited</span>
-            <strong>{trail.envelopes}</strong>
-          </li>
-          <li>
-            <span>Refused</span>
-            <strong>{trail.refused}</strong>
-          </li>
-          <li>
-            <span>Accepted</span>
-            <strong>{trail.accepted}</strong>
-          </li>
-          <li>
-            <span>Keys pinned</span>
-            <strong>{trail.agentsPinned}</strong>
-          </li>
-        </ul>
-        <p className="muted a2a-hint">
-          {trail.agentsSeen} distinct names have spoken to this gateway, {trail.agentsPinned} of them
-          with a key on file.{' '}
-          {trail.envelopes > trail.envelopeIds
-            ? `${trail.envelopes - trail.envelopeIds} envelope ${
-                trail.envelopes - trail.envelopeIds === 1 ? 'id has' : 'ids have'
-              } arrived more than once — that is the replay check having something to do.`
-            : 'Every envelope id has arrived exactly once.'}
-        </p>
+        <div className="agent-console-score" aria-label={`${trail.accepted} safe exchanges`}>
+          <Flame size={18} aria-hidden="true" />
+          <strong>{trail.accepted}</strong>
+          <span>secure wins</span>
+        </div>
+        <div className="agent-view-tabs" role="tablist" aria-label="Agent console views">
+          <button type="button" role="tab" aria-selected={view === 'line'} onClick={() => setView('line')}>
+            <MessageCircle size={16} aria-hidden="true" /> Live line
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'network'} onClick={() => setView('network')}>
+            <Network size={16} aria-hidden="true" /> Network <span>{registered.length + alumni.length}</span>
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'safety'} onClick={() => setView('safety')}>
+            <ShieldCheck size={16} aria-hidden="true" /> Safety <span>{rank.seen}/{rank.total}</span>
+          </button>
+        </div>
       </section>
 
-      <section className="ws-section" aria-labelledby="defence-h">
-        <header>
-          <h2 id="defence-h">Checks the gateway makes</h2>
-          <span className="muted">with a real refusal beside each</span>
+      <section className="mission-board" aria-labelledby="missions-h">
+        <header className="mission-board-head">
+          <div>
+            <span className="mission-board-eyebrow"><Zap size={14} aria-hidden="true" /> Best matches first</span>
+            <h2 id="missions-h">Pick your next introduction</h2>
+            <p>One strong role from each company. Nothing leaves until you approve it.</p>
+          </div>
+          <div className="mission-head-actions">
+            <span className="mission-count">{missions.length}/5 ready</span>
+            <button type="button" className="mission-refresh" onClick={() => void refreshMatches()} disabled={refreshingMatches || allMissions.length === 0}>
+              <RefreshCw size={14} className={refreshingMatches ? 'spin' : ''} aria-hidden="true" /> New matches
+            </button>
+          </div>
         </header>
+
+        {missionError ? <p className="auth-error" role="alert">{missionError}</p> : null}
+        {applyContext?.missing.length ? (
+          <p className="mission-lock-note">
+            <LockKeyhole size={15} aria-hidden="true" /> Complete {applyContext.missing.join(' and ')} before your agent can make an introduction.
+          </p>
+        ) : null}
+        {applyContext && applyContext.missing.length === 0 && !applyContext.ourFingerprint ? (
+          <p className="mission-lock-note" role="status">
+            <LockKeyhole size={15} aria-hidden="true" /> Secure signing is reconnecting. Nothing will send without a valid key.
+          </p>
+        ) : null}
+        {applyContext && !applyContext.employer ? (
+          <p className="mission-lock-note" role="status">
+            <LockKeyhole size={15} aria-hidden="true" /> The employer agent is reconnecting. You can still press send to see the live receipt.
+          </p>
+        ) : null}
+
+        {missions.length ? (
+          <div className="mission-grid">
+            {missions.map((match, index) => (
+              <CompanyMission
+                key={match.job_id}
+                match={match}
+                index={index}
+                already={Boolean(applyContext?.sent.some((attempt) => attempt.jobId === match.job_id && attempt.accepted))}
+                skipped={skipped.has(match.job_id)}
+                pending={pending === match.job_id}
+                outcome={outcomes[match.job_id]}
+                selected={selectedMission?.job_id === match.job_id}
+                onApply={() => void apply(match.job_id)}
+                onSkip={() => setSkipped((current) => {
+                  const next = new Set(current);
+                  if (next.has(match.job_id)) next.delete(match.job_id);
+                  else next.add(match.job_id);
+                  return next;
+                })}
+                onSelect={() => {
+                  setSelectedJobId(match.job_id);
+                  setView('line');
+                }}
+              />
+            ))}
+          </div>
+        ) : applyContext ? (
+          <div className="mission-empty">
+            <Sparkles size={22} aria-hidden="true" />
+            <h3>Your agent is scouting.</h3>
+            <p>Upload or refresh your resume and new company missions will appear here.</p>
+          </div>
+        ) : (
+          <p className="muted"><Loader2 size={14} className="spin" aria-hidden="true" /> Loading today&rsquo;s missions…</p>
+        )}
+      </section>
+
+      {view === 'safety' ? <section className="ws-section agent-view-panel" aria-labelledby="defence-h">
+        <header>
+          <h2 id="defence-h"><ShieldCheck size={16} aria-hidden="true" /> Safety checks</h2>
+          <span className="muted">{rank.title} · {rank.seen} of {rank.total} tested</span>
+        </header>
+        <div className="a2a-bar" role="progressbar" aria-valuenow={rank.seen} aria-valuemin={0} aria-valuemax={rank.total}>
+          <span style={{ width: `${pct}%` }} />
+        </div>
         <ul className="a2a-defences">
           {defences.map((defence) => (
             <li key={defence.key} className={defence.matched > 0 ? 'is-fired' : ''}>
@@ -370,9 +671,12 @@ export function AgentMenu() {
             </li>
           ))}
         </ul>
-      </section>
+        <p className="muted a2a-hint">
+          These checks come from real refusal receipts. {rank.unclassified > 0 ? `${rank.unclassified} unusual reasons are still unclassified.` : ''}
+        </p>
+      </section> : null}
 
-      <section className="ws-section" aria-labelledby="roster-h">
+      {view === 'network' ? <section className="ws-section agent-view-panel" aria-labelledby="roster-h">
         <header>
           <h2 id="roster-h">
             <Radio size={16} aria-hidden="true" /> Agent roster
@@ -453,14 +757,16 @@ export function AgentMenu() {
             Nothing has claimed a name this deployment does not have a key for.
           </p>
         )}
-      </section>
+      </section> : null}
 
-      <section className="ws-section" aria-labelledby="feed-h">
-        <header>
-          <h2 id="feed-h">
-            <ScrollText size={16} aria-hidden="true" /> Audit trail
-          </h2>
-          <span className="muted">newest first</span>
+      {view === 'line' ? <section className="agent-phone agent-view-panel" aria-labelledby="feed-h">
+        <header className="agent-phone-head">
+          <div className="agent-phone-avatar"><Bot size={20} aria-hidden="true" /></div>
+          <div>
+            <h2 id="feed-h">{selectedMission?.company ?? 'Your agent line'}</h2>
+            <span><i /> {selectedMission?.title ?? 'Choose a company mission'} · end-to-end encrypted</span>
+          </div>
+          <LockKeyhole size={18} aria-label="Encrypted" />
         </header>
 
         <div className="a2a-filters" role="group" aria-label="Filter the audit trail by decision">
@@ -477,79 +783,64 @@ export function AgentMenu() {
           ))}
         </div>
 
-        {feed.length === 0 ? (
-          <p className="muted">Nothing in the trail matches that filter.</p>
+        {pending === selectedMission?.job_id ? (
+          <ol className="agent-chat is-live" aria-live="polite">
+            <li className="is-mine is-accepted">
+              <div className="agent-bubble-who"><Bot size={13} aria-hidden="true" /><strong>Your agent</strong></div>
+              <div className="agent-bubble"><span className="agent-bubble-status"><Loader2 size={12} className="spin" aria-hidden="true" /> Signing</span><p>Encrypting your introduction for {selectedMission?.company ?? 'the employer'}…</p></div>
+            </li>
+          </ol>
+        ) : feed.length === 0 ? (
+          <div className="agent-chat-empty">
+            <MessageCircle size={20} aria-hidden="true" />
+            <strong>{selectedMission ? `Ready for ${selectedMission.company ?? 'this company'}` : 'Choose a company'}</strong>
+            <p>{filter === 'all' ? 'Approve the mission above and the agent exchange will appear here live.' : 'No messages for this company match that filter.'}</p>
+          </div>
         ) : (
-          <ol className="a2a-feed">
+          <ol className="agent-chat" aria-live="polite">
             {feed.map((entry) => {
               const refused = entry.decision === 'refused';
               return (
-                <li key={entry.auditId} className={refused ? 'is-refused' : 'is-accepted'}>
-                  <div className="a2a-feed-head">
-                    <span className={`a2a-decision${refused ? ' is-refused' : ''}`}>
-                      {refused ? (
-                        <>
-                          <Ban size={13} aria-hidden="true" /> Refused
-                        </>
-                      ) : (
-                        <>
-                          <Check size={13} aria-hidden="true" /> Accepted
-                        </>
-                      )}
-                    </span>
-                    <code className="a2a-name">{entry.agentName ?? 'unnamed caller'}</code>
-                    <span className="ws-pill">{entry.direction}</span>
-                    <time dateTime={entry.occurredAt} className="muted">
-                      {when(entry.occurredAt)}
-                    </time>
+                <li
+                  key={entry.auditId}
+                  className={`${entry.direction === 'outbound' ? 'is-mine' : 'is-theirs'} ${refused ? 'is-refused' : 'is-accepted'}`}
+                >
+                  <div className="agent-bubble-who">
+                    {entry.direction === 'outbound' ? <Bot size={13} aria-hidden="true" /> : <Radio size={13} aria-hidden="true" />}
+                    <strong>{entry.direction === 'outbound' ? 'Your agent' : speaker(entry.agentName)}</strong>
                   </div>
-
-                  {entry.reasons.length > 0 ? (
-                    <ul className="a2a-reasons">
-                      {entry.reasons.map((reason) => (
-                        <li key={reason}>{reason}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="a2a-reasons-none muted">
-                      {refused
-                        ? 'Refused with no reason recorded — which is itself worth knowing.'
-                        : 'No objection raised by any check.'}
+                  <div className="agent-bubble">
+                    <span className={`agent-bubble-status ${refused ? 'is-refused' : ''}`}>
+                      {refused ? <Ban size={12} aria-hidden="true" /> : <Check size={12} aria-hidden="true" />}
+                      {refused ? 'Blocked safely' : 'Verified & delivered'}
+                    </span>
+                    <p>
+                      {entry.reasons[0] ?? (refused
+                        ? 'The gateway stopped this exchange before delivery.'
+                        : entry.direction === 'outbound'
+                          ? 'Secure introduction sent.'
+                          : 'Message accepted. No safety check objected.')}
                     </p>
-                  )}
-
-                  <p className="a2a-meta">
-                    {entry.jti ? (
-                      <>
-                        <span className="a2a-key-label">envelope</span>
-                        <code>{entry.jti}</code>
-                      </>
-                    ) : (
-                      <span className="muted">No envelope id — it was rejected before parsing.</span>
-                    )}
-                  </p>
-                  <p className="a2a-meta">
-                    {entry.payloadHash ? (
-                      <>
-                        <span className="a2a-key-label">payload sha-256</span>
-                        <code>{entry.payloadHash}</code>
-                      </>
-                    ) : (
-                      <span className="muted">No payload hash — nothing was read from the body.</span>
-                    )}
-                  </p>
+                    <time dateTime={entry.occurredAt}>{when(entry.occurredAt)}</time>
+                  </div>
+                  <details className="agent-receipt">
+                    <summary><LockKeyhole size={12} aria-hidden="true" /> Encrypted receipt</summary>
+                    <div>
+                      <span>Envelope</span><code>{entry.jti ?? 'rejected before parsing'}</code>
+                      <span>Digest</span><code>{entry.payloadHash ?? 'body unread'}</code>
+                      {entry.reasons.slice(1).map((reason) => <p key={reason}>{reason}</p>)}
+                    </div>
+                  </details>
                 </li>
               );
             })}
           </ol>
         )}
 
-        <p className="muted a2a-hint">
-          Rows come straight from <code>a2a_audit</code> in Cloud SQL. What is stored is the
-          envelope id, the decision, the reasons and a SHA-256 of the body — never the body itself,
-          so the trail can be shown to anyone without leaking what was sent.
+        <p className="agent-phone-foot">
+          <LockKeyhole size={13} aria-hidden="true" /> Only delivery receipts are visible. Message bodies are never stored here.
         </p>
-      </section>
+      </section> : null}
     </>
   );
 }

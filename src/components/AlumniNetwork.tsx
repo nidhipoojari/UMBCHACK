@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { Check, Loader2, Radio, Send, Shield, Zap } from 'lucide-react';
+import { BriefcaseBusiness, Check, Loader2, LockKeyhole, MessageCircleQuestion, Radio, RefreshCw, Send, Shield, Sparkles, Zap } from 'lucide-react';
 
 import { GameHud } from '@/components/game/GameHud';
 import { useGame } from '@/components/game/useGame';
 import type { ConnectOutcome } from '@/lib/game-contract';
 import { firebaseAuth } from '@/lib/firebase';
+import { ALUMNI_QUESTIONS, DEFAULT_ALUMNI_QUESTION } from '@/lib/alumni-questions';
 
 /**
  * The alumni network screen.
@@ -100,7 +101,13 @@ export function AlumniNetwork() {
   const [major, setMajor] = useState('Computer Science');
   const [track, setTrack] = useState<string>('');
   const [busy, setBusy] = useState<string | null>(null);
+  const [celebrating, setCelebrating] = useState<string | null>(null);
   const [replies, setReplies] = useState<Record<string, string>>({});
+  const [questions, setQuestions] = useState<Record<string, string>>({});
+  const [asked, setAsked] = useState<Record<string, string>>({});
+  const [phases, setPhases] = useState<Record<string, 'preparing' | 'sealing' | 'waiting'>>({});
+  const [agentPage, setAgentPage] = useState(0);
+  const [refreshingAgents, setRefreshingAgents] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // The game layer is its own feed rather than another field on `data`,
@@ -140,12 +147,22 @@ export function AlumniNetwork() {
   }, [load]);
 
   async function connect(agent: Agent) {
+    const question = (questions[agent.campusId] ?? DEFAULT_ALUMNI_QUESTION).trim();
     setBusy(agent.campusId);
+    setPhases((current) => ({ ...current, [agent.campusId]: 'preparing' }));
     setError(null);
+    const sealing = window.setTimeout(
+      () => setPhases((current) => ({ ...current, [agent.campusId]: 'sealing' })),
+      260,
+    );
+    const waiting = window.setTimeout(
+      () => setPhases((current) => ({ ...current, [agent.campusId]: 'waiting' })),
+      720,
+    );
     try {
       const response = await authedFetch('/api/alumni/connect', {
         method: 'POST',
-        body: JSON.stringify({ campusId: agent.campusId, question: null }),
+        body: JSON.stringify({ campusId: agent.campusId, question }),
       });
       // The route is being taught to return a ConnectOutcome in another
       // worktree. Until it does it answers with the older shape, so the
@@ -165,6 +182,11 @@ export function AlumniNetwork() {
 
       feed.applyOutcome((result as unknown as ConnectOutcome) ?? null, result.alreadyConnected);
       setReplies((prev) => ({ ...prev, [agent.campusId]: result.reply }));
+      setAsked((prev) => ({ ...prev, [agent.campusId]: question }));
+      if (!result.alreadyConnected) {
+        setCelebrating(agent.campusId);
+        window.setTimeout(() => setCelebrating(null), 1400);
+      }
       setData((prev) =>
         prev
           ? {
@@ -177,6 +199,13 @@ export function AlumniNetwork() {
           : prev,
       );
     } finally {
+      window.clearTimeout(sealing);
+      window.clearTimeout(waiting);
+      setPhases((current) => {
+        const next = { ...current };
+        delete next[agent.campusId];
+        return next;
+      });
       setBusy(null);
     }
   }
@@ -203,6 +232,18 @@ export function AlumniNetwork() {
     .map((route) => ({ route, count: 0, share: 0 }));
   const allRoutes = [...stats.routes, ...extra];
   const outOfEnergy = feed.game.energy.remaining <= 0;
+  const cardsPerPage = 8;
+  const agentPages = Math.max(1, Math.ceil(agents.length / cardsPerPage));
+  const visibleAgents = agents.slice(
+    (agentPage % agentPages) * cardsPerPage,
+    (agentPage % agentPages) * cardsPerPage + cardsPerPage,
+  );
+
+  function refreshAgents() {
+    setRefreshingAgents(true);
+    setAgentPage((page) => (page + 1) % agentPages);
+    window.setTimeout(() => setRefreshingAgents(false), 420);
+  }
 
   return (
     <>
@@ -252,6 +293,7 @@ export function AlumniNetwork() {
               onChange={(e) => {
                 setMajor(e.target.value);
                 setTrack('');
+                setAgentPage(0);
               }}
             >
               {options.map((o) => (
@@ -261,7 +303,7 @@ export function AlumniNetwork() {
           </label>
           <label>
             Track
-            <select value={track} onChange={(e) => setTrack(e.target.value)}>
+            <select value={track} onChange={(e) => { setTrack(e.target.value); setAgentPage(0); }}>
               <option value="">All tracks</option>
               {tracks.map((t) => (
                 <option key={t}>{t}</option>
@@ -292,9 +334,14 @@ export function AlumniNetwork() {
       <section className="ws-section" aria-labelledby="agents-h">
         <header>
           <h2 id="agents-h">
-            <Radio size={16} aria-hidden="true" /> Alumni agents
+            <Radio size={16} aria-hidden="true" /> People who found a way in
           </h2>
-          <span className="muted">fastest to land, first</span>
+          <div className="alumni-head-actions">
+            <span className="muted">next-best people by route</span>
+            <button type="button" className="alumni-refresh" onClick={refreshAgents} disabled={refreshingAgents || agents.length <= cardsPerPage}>
+              <RefreshCw size={14} className={refreshingAgents ? 'spin' : ''} aria-hidden="true" /> New cards
+            </button>
+          </div>
         </header>
 
         {error ? (
@@ -304,84 +351,134 @@ export function AlumniNetwork() {
         ) : null}
 
         <ul className="alumni-list">
-          {agents.map((agent) => (
-            <li key={agent.campusId} className={agent.connected ? 'is-connected' : ''}>
-              <div className="alumni-id">
-                <strong>{agent.handle}</strong>
-                <span className="muted">
-                  {[agent.degreeLevel, agent.track, agent.gradYear && `’${agent.gradYear.slice(-2)}`]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </div>
+          {visibleAgents.map((agent) => {
+            const justConnected = celebrating === agent.campusId;
+            const activeQuestion = questions[agent.campusId] ?? DEFAULT_ALUMNI_QUESTION;
+            const phase = phases[agent.campusId];
+            const degree = [agent.degreeLevel, agent.track, agent.gradYear && `’${agent.gradYear.slice(-2)}`]
+              .filter(Boolean)
+              .join(' · ');
 
-              <p className="alumni-headline">
-                {agent.headline}
-                {agent.industry ? <span className="muted"> · {agent.industry}</span> : null}
-              </p>
-
-              {/* The reply, and only the reply. Printing the cohort-aware
-                  paragraph on every card repeated the same median on all of
-                  them and buried the one line that differs. It arrives when
-                  the alumnus actually answers. */}
-              {replies[agent.campusId] ? (
-                <p className="alumni-advice">{replies[agent.campusId]}</p>
-              ) : null}
-
-              <div className="alumni-actions">
-                {agent.foundVia ? (
-                  <span className="ws-pill ws-pill--route">{agent.foundVia}</span>
-                ) : null}
-                {agent.monthsToFirstJob !== null ? (
-                  <span className="ws-pill">
-                    {agent.monthsToFirstJob < 0.1 ? 'straight in' : `${agent.monthsToFirstJob.toFixed(1)} mo`}
+            return (
+              <li
+                key={agent.campusId}
+                className={`${agent.connected ? 'is-connected' : ''}${justConnected ? ' is-celebrating' : ''}`}
+              >
+                <div className="alumni-card-top">
+                  <span className="alumni-avatar" aria-hidden="true">
+                    {agent.track?.slice(0, 2).toUpperCase() ?? 'AL'}
                   </span>
-                ) : null}
-                {agent.internships ? (
-                  <span className="ws-pill">{agent.internships} internship{agent.internships === 1 ? '' : 's'}</span>
-                ) : null}
-                {agent.region ? <span className="ws-pill">{agent.region}</span> : null}
-                {agent.remote ? <span className="ws-pill">Remote</span> : null}
+                  <div className="alumni-card-copy">
+                    <div className="alumni-id">
+                      <strong>{agent.handle}</strong>
+                      {agent.connected ? (
+                        <span className="alumni-open"><span /> secure line open</span>
+                      ) : null}
+                    </div>
+                    <span className="muted alumni-degree">{degree}</span>
+                  </div>
+                  {agent.monthsToFirstJob !== null ? (
+                    <span className="alumni-speed">
+                      <Sparkles size={13} aria-hidden="true" />
+                      {agent.monthsToFirstJob < 0.1 ? 'Offer before grad' : `${agent.monthsToFirstJob.toFixed(1)} mo`}
+                    </span>
+                  ) : null}
+                </div>
 
-                {/* Disabled on empty energy, with the reason in the label
-                    rather than in a sentence under the list. A control that
-                    looks live and then fails is worse than one that says what
-                    it is waiting for. */}
-                <button
-                  type="button"
-                  className="ws-pill ws-pill--solid alumni-connect"
-                  disabled={agent.connected || busy === agent.campusId || outOfEnergy}
-                  onClick={() => connect(agent)}
-                >
-                  {agent.connected ? (
-                    <>
-                      <Check size={13} aria-hidden="true" /> Reached
-                    </>
-                  ) : busy === agent.campusId ? (
-                    <>
-                      <Loader2 size={13} className="spin" aria-hidden="true" /> Sending
-                    </>
-                  ) : outOfEnergy ? (
-                    <>
-                      <Zap size={13} aria-hidden="true" /> No energy
-                    </>
-                  ) : (
-                    <>
-                      <Send size={13} aria-hidden="true" /> Reach out
-                    </>
-                  )}
-                </button>
-              </div>
-            </li>
-          ))}
+                <div className="alumni-role">
+                  <BriefcaseBusiness size={17} aria-hidden="true" />
+                  <p className="alumni-headline">
+                    {agent.headline}
+                    {agent.industry ? <span className="muted">{agent.industry}</span> : null}
+                  </p>
+                </div>
+
+                <div className="alumni-facts" aria-label="Career path details">
+                  {agent.foundVia ? <span className="is-route">via {agent.foundVia}</span> : null}
+                  {agent.internships ? (
+                    <span>{agent.internships} internship{agent.internships === 1 ? '' : 's'}</span>
+                  ) : null}
+                  {agent.region ? <span>{agent.region}</span> : null}
+                  {agent.remote ? <span>remote</span> : null}
+                </div>
+
+                {!agent.connected ? (
+                  <fieldset className="alumni-question-set">
+                    <legend><MessageCircleQuestion size={13} aria-hidden="true" /> Ask one useful thing</legend>
+                    <div className="alumni-question-chips">
+                      {ALUMNI_QUESTIONS.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          aria-pressed={activeQuestion === item.prompt}
+                          onClick={() => setQuestions((current) => ({ ...current, [agent.campusId]: item.prompt }))}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                    <label>
+                      <span>Or edit the question</span>
+                      <input
+                        value={activeQuestion}
+                        maxLength={500}
+                        onChange={(event) => setQuestions((current) => ({ ...current, [agent.campusId]: event.target.value }))}
+                      />
+                    </label>
+                  </fieldset>
+                ) : null}
+
+                {agent.connected || phase ? (
+                  <div className="alumni-mini-chat" aria-live="polite">
+                    <div className="alumni-bubble is-sent">
+                      <LockKeyhole size={12} aria-hidden="true" />
+                      {asked[agent.campusId] ?? activeQuestion}
+                    </div>
+                    {phase ? (
+                      <div className="alumni-bubble is-progress">
+                        <Loader2 size={12} className="spin" aria-hidden="true" />
+                        {phase === 'preparing'
+                          ? 'Applicant agent is preparing the introduction…'
+                          : phase === 'sealing'
+                            ? 'Encrypting and signing the question…'
+                            : 'Waiting for the alumni agent…'}
+                      </div>
+                    ) : null}
+                    {replies[agent.campusId] ? (
+                      <div className="alumni-bubble is-received">{replies[agent.campusId]}</div>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                <div className="alumni-card-foot">
+                  <span className="alumni-privacy"><LockKeyhole size={12} aria-hidden="true" /> private introduction</span>
+                  <button
+                    type="button"
+                    className="alumni-connect"
+                    disabled={agent.connected || busy === agent.campusId || outOfEnergy || activeQuestion.trim() === ''}
+                    onClick={() => connect(agent)}
+                  >
+                    {agent.connected ? (
+                      <><Check size={15} aria-hidden="true" /> Connected</>
+                    ) : busy === agent.campusId ? (
+                      <><Loader2 size={15} className="spin" aria-hidden="true" /> Encrypting…</>
+                    ) : outOfEnergy ? (
+                      <><Zap size={15} aria-hidden="true" /> Refills tomorrow</>
+                    ) : (
+                      <><Send size={15} aria-hidden="true" /> Connect agents</>
+                    )}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
 
         {/* Kept, but cut to one line. The claim that every approach is signed
             and logged is worth making; the inventory of which columns it lands
             in belongs on the Agents screen, which already prints the trail. */}
         <p className="muted alumni-hint">
-          <Shield size={13} aria-hidden="true" /> Every approach is signed into{' '}
-          <code>a2a_audit</code>, body never stored.
+          <Shield size={13} aria-hidden="true" /> Messages stay encrypted. Only a signed receipt reaches the audit trail.
         </p>
       </section>
     </>

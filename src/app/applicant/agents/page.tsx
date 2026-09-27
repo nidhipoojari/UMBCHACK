@@ -15,8 +15,8 @@ export default function AgentsPage() {
     <main id="main" className="ws-main">
       {/* Trimmed to the claim. The enumeration that followed it was a list of
           the sections underneath, which the reader is about to scroll past. */}
-      <PageHead eyebrow="Agents" title="Who your agent will speak to." sample={false}>
-        Every key, every caller without one, every decision — refusals included.
+      <PageHead eyebrow="Agents" title="Your career sidekick is on it." sample={false}>
+        Pick a company, approve the introduction, and watch both agents handle the secure handoff.
       </PageHead>
       <AgentMenu />
     </main>

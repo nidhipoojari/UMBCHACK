@@ -9,9 +9,14 @@
  * takes to intake_events; this polls them and shows the applicant exactly what
  * is happening to their resume, instead of a spinner.
  *
+ * Once the resume itself is parsed, this page also matches the applicant to
+ * their coursework stand-in from the hackUMBC dataset (POST /api/coursework) and
+ * shows it as one more step in the same log. The match is made once per
+ * applicant, so a second upload shows the same student again.
+ *
  * Deliberately NOT an automatic redirect when it finishes: the log is the most
  * informative thing the product shows about itself, so the Next button is
- * focused instead.
+ * focused instead. Next leads to the Jobs page, where the gap interview is.
  */
 import { onAuthStateChanged } from 'firebase/auth';
 import Link from 'next/link';
@@ -19,9 +24,13 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 import type { IntakeEvent, IntakeStatusResponse } from '@/app/api/intake/[documentId]/route';
+import type { TwinSummary } from '@/lib/coursework';
 import { firebaseAuth } from '@/lib/firebase';
 
 type Outcome = { kind: 'running' } | { kind: 'complete' } | { kind: 'error'; message: string };
+
+/** The coursework step, which this page runs itself rather than reading from intake_events. */
+type CourseworkStep = { state: 'idle' } | { state: 'start' } | { state: 'ok'; twin: TwinSummary } | { state: 'warn'; detail: string };
 
 const MARK: Record<IntakeEvent['state'], string> = {
   start: '…',
@@ -45,6 +54,7 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
   const router = useRouter();
   const [events, setEvents] = useState<IntakeEvent[]>([]);
   const [outcome, setOutcome] = useState<Outcome>({ kind: 'running' });
+  const [coursework, setCoursework] = useState<CourseworkStep>({ state: 'idle' });
   const doneAction = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -52,13 +62,37 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     const startedAt = Date.now();
     let parsedAt: number | undefined;
+    // The coursework match runs once, as soon as there is a parsed resume to match from.
+    let courseworkDone: Promise<void> | undefined;
+
+    const matchCoursework = async (token: string) => {
+      setCoursework({ state: 'start' });
+      try {
+        const response = await fetch('/api/coursework', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        const body = (await response.json().catch(() => ({}))) as { twin?: TwinSummary; error?: string };
+        if (!stopped) {
+          setCoursework(
+            response.ok && body.twin
+              ? { state: 'ok', twin: body.twin }
+              : { state: 'warn', detail: body.error ?? 'Skipped for now. Your matches still work without it.' },
+          );
+        }
+      } catch {
+        if (!stopped) setCoursework({ state: 'warn', detail: 'Skipped for now. Your matches still work without it.' });
+      }
+    };
 
     const poll = async () => {
       const user = firebaseAuth.currentUser;
       if (!user || stopped) return;
       try {
+        const token = await user.getIdToken();
         const response = await fetch(`/api/intake/${documentId}`, {
-          headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+          headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',
         });
         if (response.status === 404) {
@@ -74,9 +108,11 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
             // settled — or after ENRICH_TIMEOUT_MS, so a stuck enricher never
             // holds the applicant here; the profile is usable either way.
             parsedAt ??= Date.now();
+            courseworkDone ??= matchCoursework(token);
             const settled = body.events.every((event) => event.state !== 'start');
             if (settled || Date.now() - parsedAt > ENRICH_TIMEOUT_MS) {
-              setOutcome({ kind: 'complete' });
+              await courseworkDone;
+              if (!stopped) setOutcome({ kind: 'complete' });
               return;
             }
           }
@@ -145,6 +181,39 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
           </li>
         ))}
 
+        {coursework.state !== 'idle' ? (
+          <li className={`progress-line is-${coursework.state}`}>
+            <span className="progress-mark" aria-hidden="true">
+              {MARK[coursework.state]}
+            </span>
+            <span className="progress-body">
+              {coursework.state === 'start' ? (
+                <>
+                  <strong>Matching your coursework profile</strong>
+                  <small>Finding the student in the hackUMBC dataset whose courses fit your resume best.</small>
+                </>
+              ) : coursework.state === 'ok' ? (
+                <>
+                  <strong>Coursework profile matched</strong>
+                  <small>
+                    {coursework.twin.major} · {coursework.twin.track} track · {coursework.twin.classLevel}
+                    {coursework.twin.sharedSkills.length
+                      ? ` · ${coursework.twin.sharedSkills.length} of your skills are taught in their courses`
+                      : ''}
+                    . From the hackUMBC synthetic dataset.
+                  </small>
+                </>
+              ) : (
+                <>
+                  <strong>Coursework profile</strong>
+                  <small>{coursework.detail}</small>
+                </>
+              )}
+            </span>
+            <span className="progress-ms" />
+          </li>
+        ) : null}
+
         {events.length === 0 && outcome.kind === 'running' ? (
           <li className="progress-line is-start">
             <span className="progress-mark" aria-hidden="true">
@@ -161,8 +230,8 @@ export function IntakeProgress({ documentId }: { documentId: string }) {
 
       {outcome.kind === 'complete' ? (
         <div className="progress-done">
-          <button className="primary" type="button" onClick={() => router.push('/applicant')} ref={doneAction}>
-            Next
+          <button className="primary" type="button" onClick={() => router.push('/applicant/jobs')} ref={doneAction}>
+            Next: close your skill gaps
           </button>
         </div>
       ) : null}
