@@ -3,6 +3,7 @@ import 'server-only';
 import { createHash, randomUUID } from 'node:crypto';
 
 import { db } from '@/lib/db';
+import { ALUMNI_QUESTIONS } from '@/lib/alumni-questions';
 import { diffStates, gameStateFor, levelFor } from '@/lib/game';
 import type { ConnectOutcome } from '@/lib/game-contract';
 
@@ -222,6 +223,49 @@ function adviceFor(
 }
 
 /**
+ * A question changes the answer, but never changes the evidence. Presets and
+ * custom wording are both routed through the same small set of facts available
+ * in the anonymous alumni row; when wording does not match a preset, the
+ * fuller cohort-aware answer is the honest fallback.
+ */
+function answerForQuestion(
+  question: string | null,
+  agent: Omit<AlumniAgent, 'advice' | 'connected' | 'headline'>,
+  stats: CohortStats,
+): string {
+  const normalized = question?.trim().toLowerCase() ?? '';
+  const preset = (id: string) =>
+    ALUMNI_QUESTIONS.find((item) => item.id === id)?.prompt.toLowerCase() ?? '';
+
+  if (normalized === preset('first-role') || /how.*(land|get).*(role|job)/.test(normalized)) {
+    const route = agent.foundVia ? `through ${agent.foundVia}` : 'through a route I did not report';
+    const timing = agent.monthsToFirstJob !== null
+      ? agent.monthsToFirstJob < 0.1
+        ? 'before graduation'
+        : `in ${agent.monthsToFirstJob.toFixed(1)} months`
+      : 'on a timeline I did not report';
+    return `I found my first role ${route}, ${timing}. Focus on that route, then ask one person for a concrete next step.`;
+  }
+
+  if (normalized === preset('stand-out') || /stand out/.test(normalized)) {
+    const experience = agent.internships
+      ? `${agent.internships} internship${agent.internships === 1 ? '' : 's'}`
+      : 'the experience I could show';
+    return `For my path, ${experience} and a focused route mattered most. I used ${agent.foundVia ?? 'a route I did not report'} to reach ${agent.jobTitle ?? 'my first role'}.`;
+  }
+
+  if (normalized === preset('do-differently') || /differently|change|starting again/.test(normalized)) {
+    return `I would start with ${agent.foundVia ?? 'direct conversations'} earlier and spend less time applying without context. Ask people in ${agent.major} what one signal made them comfortable referring someone.`;
+  }
+
+  if (normalized === preset('this-week') || /this week|one useful|next step/.test(normalized)) {
+    return `This week, find one ${agent.jobTitle ?? 'early-career'} role and one person connected to ${agent.foundVia ?? 'that hiring route'}. Tailor one project bullet to the role, then ask for feedback instead of a generic referral.`;
+  }
+
+  return adviceFor(agent, stats);
+}
+
+/**
  * The roster a student sees: alumni from their cohort who actually landed
  * somewhere, ordered so the most instructive are first.
  *
@@ -235,7 +279,7 @@ export async function alumniRoster(
   userId: string,
   major: string,
   track: string | null,
-  limit = 12,
+  limit = 32,
 ): Promise<AlumniAgent[]> {
   const stats = await cohortStats(major, track);
 
@@ -262,30 +306,43 @@ export async function alumniRoster(
     internship_count: string | null;
     connected: boolean;
   }>(
-    `SELECT DISTINCT ON (a.first_job_found_via)
-            a.campus_id, a.major, a.track, a.degree_level, a.graduation_year,
-            a.first_job_title, a.first_employer, a.first_employer_industry,
-            a.first_job_region, a.first_job_is_remote, a.months_to_first_job,
-            a.first_job_found_via, a.internship_count,
-            (c.campus_id IS NOT NULL) AS connected
-       FROM alumni a
-       LEFT JOIN alumni_connections c
-              ON c.campus_id = a.campus_id AND c.user_id = $2
-      WHERE a.major = $1 ${trackFilter}
-        AND a.first_destination = 'Employed Full-Time'
-        AND a.first_job_title IS NOT NULL
-        AND a.first_job_title NOT IN ('Not Applicable', 'No Response', '')
-        AND a.first_job_found_via NOT IN ('Not Applicable', 'No Response', '')
-      ORDER BY a.first_job_found_via,
-               CASE WHEN a.months_to_first_job ~ '${NUMERIC_SQL}'
-                    THEN a.months_to_first_job::numeric END NULLS LAST,
-               a.campus_id
+    `WITH ranked AS (
+       SELECT a.campus_id, a.major, a.track, a.degree_level, a.graduation_year,
+              a.first_job_title, a.first_employer, a.first_employer_industry,
+              a.first_job_region, a.first_job_is_remote, a.months_to_first_job,
+              a.first_job_found_via, a.internship_count,
+              (c.campus_id IS NOT NULL) AS connected,
+              row_number() OVER (
+                PARTITION BY a.first_job_found_via
+                ORDER BY CASE WHEN a.months_to_first_job ~ '${NUMERIC_SQL}'
+                              THEN a.months_to_first_job::numeric END NULLS LAST,
+                         a.campus_id
+              ) AS route_rank
+         FROM alumni a
+         LEFT JOIN alumni_connections c
+                ON c.campus_id = a.campus_id AND c.user_id = $2
+        WHERE a.major = $1 ${trackFilter}
+          AND a.first_destination = 'Employed Full-Time'
+          AND a.first_job_title IS NOT NULL
+          AND a.first_job_title NOT IN ('Not Applicable', 'No Response', '')
+          AND a.first_job_found_via NOT IN ('Not Applicable', 'No Response', '')
+     )
+     SELECT campus_id, major, track, degree_level, graduation_year,
+            first_job_title, first_employer, first_employer_industry,
+            first_job_region, first_job_is_remote, months_to_first_job,
+            first_job_found_via, internship_count, connected
+       FROM ranked
+      ORDER BY route_rank,
+               CASE WHEN months_to_first_job ~ '${NUMERIC_SQL}'
+                    THEN months_to_first_job::numeric END NULLS LAST,
+               campus_id
       LIMIT $3`,
     params,
   );
 
-  // DISTINCT ON had to order by the route to pick one per route; the student
-  // wants them fastest-first, so the final ordering happens here. Eight rows.
+  // SQL deals one candidate from every route before a second candidate from
+  // any route. Keep that round-robin order so refresh exposes the next-best
+  // person per route instead of another wall of the same path.
   return rows.map((row) => {
     const base = {
       campusId: row.campus_id,
@@ -311,8 +368,7 @@ export async function alumniRoster(
       advice: adviceFor(base, stats),
       connected: row.connected,
     };
-  })
-    .sort((a, b) => (a.monthsToFirstJob ?? 1e9) - (b.monthsToFirstJob ?? 1e9));
+  });
 }
 
 /** The cohorts a student can pick from — the dataset's own values, not a guess. */
@@ -469,10 +525,13 @@ export async function connectToAlumnus(
     track: string | null;
     first_job_title: string | null;
     first_employer: string | null;
+    first_employer_industry: string | null;
     first_job_found_via: string | null;
     months_to_first_job: string | null;
+    internship_count: string | null;
   }>(
-    `SELECT major, track, first_job_title, first_employer, first_job_found_via, months_to_first_job
+    `SELECT major, track, first_job_title, first_employer, first_employer_industry,
+            first_job_found_via, months_to_first_job, internship_count
        FROM alumni WHERE campus_id = $1`,
     [campusId],
   );
@@ -509,27 +568,25 @@ export async function connectToAlumnus(
   // could report an unlock that was only a change of denominator.
   const stats = await cohortStats(a.major, clean(a.track));
 
-  const reply = adviceFor(
-    {
-      campusId,
-      handle: '',
-      major: a.major,
-      track: clean(a.track),
-      degreeLevel: null,
-      gradYear: null,
-      jobTitle: clean(a.first_job_title),
-      employer: clean(a.first_employer),
-      industry: null,
-      region: null,
-      remote: false,
-      monthsToFirstJob: NUMERIC_RE.test(a.months_to_first_job ?? '')
-        ? Number(a.months_to_first_job)
-        : null,
-      foundVia: clean(a.first_job_found_via),
-      internships: null,
-    },
-    stats,
-  );
+  const alumniAgent = {
+    campusId,
+    handle: '',
+    major: a.major,
+    track: clean(a.track),
+    degreeLevel: null,
+    gradYear: null,
+    jobTitle: clean(a.first_job_title),
+    employer: clean(a.first_employer),
+    industry: clean(a.first_employer_industry),
+    region: null,
+    remote: false,
+    monthsToFirstJob: NUMERIC_RE.test(a.months_to_first_job ?? '')
+      ? Number(a.months_to_first_job)
+      : null,
+    foundVia: clean(a.first_job_found_via),
+    internships: NUMERIC_RE.test(a.internship_count ?? '') ? Number(a.internship_count) : null,
+  };
+  const reply = answerForQuestion(question, alumniAgent, stats);
 
   const before = await gameStateFor(userId, stats.routes);
 

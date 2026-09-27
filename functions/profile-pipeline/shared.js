@@ -4,6 +4,7 @@
  */
 import { Connector } from '@google-cloud/cloud-sql-connector';
 import { PubSub } from '@google-cloud/pubsub';
+import { jsonrepair } from 'jsonrepair';
 import { GoogleGenAI } from '@google/genai';
 import pg from 'pg';
 
@@ -100,5 +101,27 @@ export function parseJsonObject(text) {
   const start = body.indexOf('{');
   const end = body.lastIndexOf('}');
   if (start === -1 || end <= start) throw new Error('The model reply had no JSON object.');
-  return JSON.parse(body.slice(start, end + 1));
+  const candidate = body.slice(start, end + 1);
+
+  try {
+    return JSON.parse(candidate);
+  } catch (first) {
+    // responseMimeType: 'application/json' is not a guarantee. The failure that
+    // prompted this was a DROPPED CLOSING BRACE between two array elements — a
+    // structurally unclosed object, not a trailing comma. jsonrepair walks the
+    // text as a parser and closes what is open, instead of guessing by regex.
+    // It runs only after JSON.parse has failed, so a well-formed reply is never
+    // rewritten. (Ported from functions/extract-resume, 426f943.)
+    try {
+      return JSON.parse(jsonrepair(candidate));
+    } catch {
+      // The ORIGINAL error, plus the text around it: the reply is logged nowhere
+      // else, so a bare "position 439" is a defect in a string no one can read.
+      const at = Number(String(first.message).match(/position (\d+)/)?.[1] ?? 0);
+      const from = Math.max(0, at - 160);
+      throw new Error(
+        `${first.message} | reply[${from}..${at + 160}]: ${JSON.stringify(candidate.slice(from, at + 160))}`,
+      );
+    }
+  }
 }

@@ -8,17 +8,24 @@
  * wide windows the page makes room for it (data-transcript on <html>); on
  * narrow ones it overlays the page.
  *
- * PLACEHOLDER. Nothing here talks to an agent yet: the conversation is seeded
- * with sample turns and a typed message gets a canned reply. The list is still
- * aria-live, and a hidden live region reads the latest line while the panel is
- * collapsed, so the accessibility behaviour is real even if the agent is not.
+ * FOR APPLICANTS it is the real agent: typed messages go to /api/agent, and the
+ * list is the shared conversation (conversation.tsx), so turns spoken to the
+ * floating face appear here too, marked with a microphone, along with what the
+ * agent looked up. Typed and spoken turns are one conversation to the agent.
+ *
+ * FOR EMPLOYERS it is still a placeholder: seeded sample turns and a canned
+ * reply, because the agent's tools read applicant records.
+ *
+ * Either way the list is aria-live, and a hidden live region reads the latest
+ * line while the panel is collapsed.
  */
-import { CornerDownLeft, MapPin, PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { CornerDownLeft, MapPin, Mic, PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import type { Role } from '@/lib/users';
 
+import { useConversation } from './conversation';
 import { NARROW_QUERY, usePanelState } from './panel-state';
 import { type ChatEntry, TranscriptAction } from './TranscriptAction';
 
@@ -43,13 +50,28 @@ const PROACTIVE: Record<Role, { text: string; label: string; href: string }> = {
 
 const PLACEHOLDER_REPLY = 'The chat is not connected yet. This is a placeholder reply.';
 
+/** Shown to an applicant with an empty conversation; not part of it. */
+const WELCOME: ChatEntry = {
+  id: 'welcome',
+  role: 'agent',
+  text: 'Hi! Ask me about your matches, your pipeline or your profile. Type here, or click my face to talk.',
+};
+
 export function ChatPanel({ role, pageName }: { role: Role; pageName: string | null }) {
   const router = useRouter();
   const panelId = useId();
   const [open, setOpen] = usePanelState('agenthire:chat', false);
-  const [entries, setEntries] = useState<ChatEntry[]>(SEED[role]);
+  const conversation = useConversation();
+  const [seeded, setSeeded] = useState<ChatEntry[]>(SEED[role]);
   const [value, setValue] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [placeholderBusy, setPlaceholderBusy] = useState(false);
+  const live = conversation !== null;
+  const liveEntries = conversation?.entries;
+  const entries = useMemo(
+    () => (liveEntries ? (liveEntries.length ? liveEntries : [WELCOME]) : seeded),
+    [liveEntries, seeded],
+  );
+  const busy = live ? conversation.busy : placeholderBusy;
   const [proactive, setProactive] = useState(true);
   const listRef = useRef<HTMLOListElement | null>(null);
 
@@ -87,12 +109,16 @@ export function ChatPanel({ role, pageName }: { role: Role; pageName: string | n
     const text = value.trim();
     if (!text || busy) return;
     setValue('');
-    setBusy(true);
+    if (live) {
+      void conversation.send(text);
+      return;
+    }
+    setPlaceholderBusy(true);
     const stamp = Date.now();
-    setEntries((prev) => [...prev, { id: `u${stamp}`, role: 'user', text }]);
+    setSeeded((prev) => [...prev, { id: `u${stamp}`, role: 'user', text }]);
     window.setTimeout(() => {
-      setEntries((prev) => [...prev, { id: `a${stamp}`, role: 'agent', text: PLACEHOLDER_REPLY }]);
-      setBusy(false);
+      setSeeded((prev) => [...prev, { id: `a${stamp}`, role: 'agent', text: PLACEHOLDER_REPLY }]);
+      setPlaceholderBusy(false);
     }, 700);
   }
 
@@ -155,7 +181,15 @@ export function ChatPanel({ role, pageName }: { role: Role; pageName: string | n
                   <TranscriptAction key={entry.id} entry={entry} />
                 ) : (
                   <li key={entry.id} className={`vt-entry vt-${entry.role}`}>
-                    <span className="vt-who">{entry.role === 'user' ? 'You' : 'Agent'}</span>
+                    <span className="vt-who">
+                      {entry.role === 'user' ? 'You' : 'Agent'}
+                      {entry.via === 'voice' ? (
+                        <>
+                          <Mic size={12} aria-hidden="true" className="vt-via" />
+                          <span className="sr-only"> (spoken)</span>
+                        </>
+                      ) : null}
+                    </span>
                     <span className="vt-said">{entry.text}</span>
                   </li>
                 ),
@@ -163,12 +197,16 @@ export function ChatPanel({ role, pageName }: { role: Role; pageName: string | n
               {busy ? (
                 <li className="vt-entry vt-agent vt-typing">
                   <span className="vt-who">Agent</span>
-                  <span className="vt-said">Typing…</span>
+                  <span className="vt-said">{live ? 'Thinking…' : 'Typing…'}</span>
                 </li>
               ) : null}
             </ol>
 
-            <p className="vt-note">Placeholder conversation. The agent is not connected yet.</p>
+            <p className="vt-note">
+              {live
+                ? 'Typed and spoken messages both land here. Click the agentHire face to talk.'
+                : 'Placeholder conversation. The agent is not connected yet.'}
+            </p>
 
             <form className="vt-reply" onSubmit={submit}>
               <input

@@ -66,6 +66,9 @@ export function StreakMeter({
       <div className="g-streak-row">
         <span className="g-streak-mark" aria-hidden="true">
           <Flame className="g-flame" size={20} />
+          <i className="g-spark g-spark-one" />
+          <i className="g-spark g-spark-two" />
+          <i className="g-spark g-spark-three" />
         </span>
         {/* The count-up starts one day back only when this action earned the
             day, so a page load renders the figure at rest. */}

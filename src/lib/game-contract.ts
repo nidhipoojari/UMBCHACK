@@ -140,7 +140,7 @@ export type ConnectOutcome = {
 };
 
 /** Defaults. Tuned so a session has a shape: enough to explore, not endless. */
-export const DEFAULT_DAILY_ENERGY = 5;
+export const DEFAULT_DAILY_ENERGY = 12;
 export const XP_PER_CONNECTION = 10;
 export const XP_PER_LEVEL = 50;
 export const LEVEL_TITLES = [

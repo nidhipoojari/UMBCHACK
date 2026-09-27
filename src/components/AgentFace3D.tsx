@@ -6,6 +6,9 @@ import * as THREE from 'three';
 
 import type { FaceMood } from './AgentFace';
 
+/** Which nose the face wears: the speaker cone, or a microphone (the floating agent's mic switch). */
+export type NoseShape = 'speaker' | 'mic';
+
 /**
  * agentHire's face, with real form.
  *
@@ -93,14 +96,17 @@ function Head({
   reduced,
   muted,
   nose: hasNose,
+  noseShape,
   onNose,
 }: {
   mood: FaceMood;
   reduced: boolean;
   muted: boolean;
   nose: boolean;
+  noseShape: NoseShape;
   onNose?: () => void;
 }) {
+
   const root = useRef<THREE.Group>(null);
   const browL = useRef<THREE.Mesh>(null);
   const browR = useRef<THREE.Mesh>(null);
@@ -145,6 +151,21 @@ function Head({
    *  have to hit is twice its size. Invisible, not `visible={false}` — three
    *  skips the latter when raycasting. */
   const noseHitGeometry = useMemo(() => new THREE.SphereGeometry(0.3, 12, 12), []);
+
+  /** The microphone nose, built facing out of the face: a rounded head in a U-shaped
+   *  holder on a short stem and base, the shape everyone reads as "mic". */
+  const mic = useMemo(
+    () => ({
+      head: new THREE.CapsuleGeometry(0.058, 0.085, 6, 16),
+      holder: new THREE.TorusGeometry(0.092, 0.015, 8, 24, Math.PI),
+      stem: new THREE.CylinderGeometry(0.014, 0.014, 0.06, 10),
+      base: new THREE.CapsuleGeometry(0.013, 0.08, 4, 8),
+      // Muted: a slash across it, with a paper-coloured gap behind so it reads on the ink.
+      slash: new THREE.CapsuleGeometry(0.016, 0.3, 4, 10),
+      gap: new THREE.CapsuleGeometry(0.03, 0.3, 4, 10),
+    }),
+    [],
+  );
   const hovered = useRef(0);
   const eyeAt = useMemo(() => ({ left: onSphere(58, 76, 1.0), right: onSphere(102, 76, 1.0) }), []);
 
@@ -279,14 +300,18 @@ function Head({
                   event.stopPropagation();
                   hovered.current = 1;
                   document.body.style.cursor = 'pointer';
+                  // On the canvas too, so it shows inside a parent with its own
+                  // cursor (the floating agent is draggable, so it says grab).
+                  (event.nativeEvent.target as HTMLElement | null)?.style.setProperty('cursor', 'pointer');
                 }
               : undefined
           }
           onPointerOut={
             onNose
-              ? () => {
+              ? (event) => {
                   hovered.current = 0;
                   document.body.style.cursor = '';
+                  (event.nativeEvent.target as HTMLElement | null)?.style.removeProperty('cursor');
                 }
               : undefined
           }
@@ -296,11 +321,29 @@ function Head({
               <meshBasicMaterial transparent opacity={0} depthWrite={false} />
             </mesh>
           ) : null}
-          <mesh geometry={noseGeometry} material={noseMaterial} rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.07]} />
-          <mesh geometry={noseRingGeometry} material={noseMaterial} position={[0, 0, 0.01]} />
-          {muted ? (
-            <mesh geometry={slashGeometry} material={slashMaterial} rotation={[0, 0, Math.PI / 4]} position={[0, 0, 0.19]} />
-          ) : null}
+          {noseShape === 'mic' ? (
+            <>
+              <mesh geometry={mic.head} material={noseMaterial} position={[0, 0.045, 0.08]} />
+              {/* The half-torus arcs over the top; turned over, it cradles the head from below. */}
+              <mesh geometry={mic.holder} material={noseMaterial} rotation={[0, 0, Math.PI]} position={[0, 0.03, 0.08]} />
+              <mesh geometry={mic.stem} material={noseMaterial} position={[0, -0.09, 0.08]} />
+              <mesh geometry={mic.base} material={noseMaterial} rotation={[0, 0, Math.PI / 2]} position={[0, -0.122, 0.08]} />
+              {muted ? (
+                <>
+                  <mesh geometry={mic.gap} material={slashMaterial} rotation={[0, 0, Math.PI / 4]} position={[0, -0.01, 0.13]} />
+                  <mesh geometry={mic.slash} material={noseMaterial} rotation={[0, 0, Math.PI / 4]} position={[0, -0.01, 0.15]} />
+                </>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <mesh geometry={noseGeometry} material={noseMaterial} rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0.07]} />
+              <mesh geometry={noseRingGeometry} material={noseMaterial} position={[0, 0, 0.01]} />
+              {muted ? (
+                <mesh geometry={slashGeometry} material={slashMaterial} rotation={[0, 0, Math.PI / 4]} position={[0, 0, 0.19]} />
+              ) : null}
+            </>
+          )}
         </group>
       ) : null}
     </group>
@@ -312,10 +355,13 @@ export default function AgentFace3D({
   size = 260,
   muted = false,
   nose = false,
+  noseShape = 'speaker',
   onNose,
 }: {
   mood?: FaceMood;
   size?: number;
+  /** 'mic' for the floating agent, whose nose is its microphone switch. */
+  noseShape?: NoseShape;
   /** Draws the bar across the speaker cone. */
   muted?: boolean;
   /** Draw the speaker-cone nose. Separate from onNose on purpose: the nose is
@@ -347,7 +393,7 @@ export default function AgentFace3D({
         <ambientLight intensity={2.4} />
         <directionalLight position={[2.5, 3.5, 4]} intensity={1.2} />
         <directionalLight position={[-3, -1, 2]} intensity={0.45} />
-        <Head mood={mood} reduced={reduced} muted={muted} nose={nose || Boolean(onNose)} onNose={onNose} />
+        <Head mood={mood} reduced={reduced} muted={muted} nose={nose || Boolean(onNose)} noseShape={noseShape} onNose={onNose} />
       </Canvas>
     </div>
   );

@@ -2,12 +2,20 @@
  * An ACTION line in the chat: what the agent did, rendered by kind. The `never` in the switch means adding a kind without a case here
  * fails the type check.
  */
-import { BadgeCheck, Ban, BriefcaseBusiness, ListChecks, Navigation, UserCheck } from 'lucide-react';
+import { BadgeCheck, Ban, BriefcaseBusiness, ListChecks, MicOff, Navigation, Search, UserCheck } from 'lucide-react';
 
-export type ActionKind = 'profile_updated' | 'job_matched' | 'refused' | 'navigated' | 'job_status_set';
+export type ActionKind =
+  | 'profile_updated'
+  | 'job_matched'
+  | 'refused'
+  | 'navigated'
+  | 'job_status_set'
+  | 'looked_up'
+  | 'ended';
 
 export type ChatEntry =
-  | { id: string; role: 'agent' | 'user'; text: string }
+  /** `via` marks how a turn happened: typed in the drawer, or spoken to the floating agent. */
+  | { id: string; role: 'agent' | 'user'; text: string; via?: 'text' | 'voice' }
   | { id: string; role: 'action'; kind: ActionKind; state: 'pending' | 'done' | 'failed'; text: string };
 
 type ActionEntry = Extract<ChatEntry, { role: 'action' }>;
@@ -18,6 +26,8 @@ const LABELS: Record<ActionKind, string> = {
   refused: 'REFUSED',
   navigated: 'OPENED',
   job_status_set: 'STAGE CHANGED',
+  looked_up: 'CHECKED',
+  ended: 'ENDED',
 };
 
 function icon(kind: ActionKind) {
@@ -32,6 +42,10 @@ function icon(kind: ActionKind) {
       return <Navigation size={15} aria-hidden="true" />;
     case 'job_status_set':
       return <ListChecks size={15} aria-hidden="true" />;
+    case 'looked_up':
+      return <Search size={15} aria-hidden="true" />;
+    case 'ended':
+      return <MicOff size={15} aria-hidden="true" />;
     default: {
       const unhandled: never = kind;
       return unhandled;
@@ -45,7 +59,7 @@ export function TranscriptAction({ entry }: { entry: ActionEntry }) {
       <span className="vt-action-tag">
         {/* A settled refusal keeps the refusal icon; a tick beside "I would not
             open that" would read as success. */}
-        {entry.state === 'done' && entry.kind !== 'refused' ? (
+        {entry.state === 'done' && entry.kind !== 'refused' && entry.kind !== 'ended' ? (
           <BadgeCheck size={15} aria-hidden="true" />
         ) : (
           icon(entry.kind)
