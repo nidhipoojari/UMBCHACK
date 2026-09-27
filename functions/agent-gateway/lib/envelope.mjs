@@ -1,0 +1,130 @@
+/**
+ * envelope.mjs — the signed message format two agents use to talk.
+ *
+ * A message is a compact JWS (ES256) over a small set of claims. The point is
+ * that a receiver can answer three questions from the envelope alone, before it
+ * looks at the payload at all:
+ *
+ *   who sent this   — `iss`, proven by the signature of a key we have pinned
+ *   was it for us   — `aud` must equal our own agent name
+ *   is it fresh     — `iat`/`exp`, and `jti` seen at most once
+ *
+ * Deliberately no dependency: node's crypto does ES256 over P-256 directly, and
+ * a JWS library would be a larger trusted base than the forty lines below.
+ *
+ * A NOTE ON ORDER. readClaimsUnverified() exists because of a genuine
+ * bootstrapping problem: to find the key that verifies a message you must first
+ * know who the message says it is from. Its output decides WHICH registry row to
+ * fetch and nothing else. Nothing it returns is trusted, and callers must not
+ * branch on it beyond that lookup — which is why it is named to be awkward to
+ * misuse.
+ */
+import { createSign, createVerify, createHash, randomUUID } from 'node:crypto';
+
+export const ALG = 'ES256';
+export const TYP = 'agenthire-a2a+jws';
+export const MAX_AGE_SECONDS = 120;
+
+const b64u = buf => Buffer.from(buf).toString('base64url');
+const unb64u = str => Buffer.from(str, 'base64url');
+
+/** sha256 of a DER SPKI public key, base64url. This is what the registry pins. */
+export function fingerprint(publicKeyPem) {
+  const der = createHash('sha256')
+    .update(Buffer.from(publicKeyPem.replace(/-----[^-]+-----|\s/g, ''), 'base64'))
+    .digest();
+  return b64u(der);
+}
+
+export function sign({ payload, issuer, audience, privateKeyPem, ttlSeconds = MAX_AGE_SECONDS }) {
+  const now = Math.floor(Date.now() / 1000);
+  const claims = {
+    iss: issuer,
+    aud: audience,
+    jti: randomUUID(),
+    iat: now,
+    exp: now + ttlSeconds,
+    payload,
+  };
+  const header = { alg: ALG, typ: TYP };
+  const signingInput = `${b64u(JSON.stringify(header))}.${b64u(JSON.stringify(claims))}`;
+  // dsaEncoding 'ieee-p1363' is the raw r||s form JWS requires; node's default
+  // is DER, which verifies nowhere else.
+  const sig = createSign('SHA256')
+    .update(signingInput)
+    .sign({ key: privateKeyPem, dsaEncoding: 'ieee-p1363' });
+  return `${signingInput}.${b64u(sig)}`;
+}
+
+/** NOT TRUSTED. Only for choosing which registry row to fetch. See header. */
+export function readClaimsUnverified(jws) {
+  const parts = String(jws ?? '').split('.');
+  if (parts.length !== 3) return null;
+  try {
+    return JSON.parse(unb64u(parts[1]).toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @returns {{ok: true, claims: object} | {ok: false, reasons: string[]}}
+ *
+ * Every check that can fail contributes a reason rather than a bare false, so a
+ * refusal can be audited and explained to a human instead of appearing as an
+ * unexplained rejection.
+ */
+export function verify(jws, { publicKeyPem, expectedIssuer, expectedAudience, maxAgeSeconds = MAX_AGE_SECONDS }) {
+  const reasons = [];
+  const parts = String(jws ?? '').split('.');
+  if (parts.length !== 3) return { ok: false, reasons: ['Envelope is not a compact JWS.'] };
+
+  let header;
+  let claims;
+  try {
+    header = JSON.parse(unb64u(parts[0]).toString('utf8'));
+    claims = JSON.parse(unb64u(parts[1]).toString('utf8'));
+  } catch {
+    return { ok: false, reasons: ['Envelope header or claims are not valid JSON.'] };
+  }
+
+  // Pinning alg rejects the "alg": "none" and algorithm-substitution families
+  // outright rather than relying on the verifier to be asked for the right one.
+  if (header.alg !== ALG) reasons.push(`Unsupported algorithm ${header.alg}; only ${ALG} is accepted.`);
+  if (header.typ !== TYP) reasons.push(`Unexpected envelope type ${header.typ}.`);
+
+  const signingInput = `${parts[0]}.${parts[1]}`;
+  let signatureOk = false;
+  try {
+    signatureOk = createVerify('SHA256')
+      .update(signingInput)
+      .verify({ key: publicKeyPem, dsaEncoding: 'ieee-p1363' }, unb64u(parts[2]));
+  } catch {
+    signatureOk = false;
+  }
+  if (!signatureOk) reasons.push('Signature does not verify against the registered key.');
+
+  if (expectedIssuer && claims.iss !== expectedIssuer) {
+    reasons.push('Issuer does not match the agent whose key signed this.');
+  }
+  if (expectedAudience && claims.aud !== expectedAudience) {
+    reasons.push(`Envelope is addressed to ${claims.aud ?? 'nobody'}, not to us.`);
+  }
+  if (!claims.jti) reasons.push('Envelope has no jti, so replay cannot be prevented.');
+
+  const now = Math.floor(Date.now() / 1000);
+  if (typeof claims.iat !== 'number' || typeof claims.exp !== 'number') {
+    reasons.push('Envelope is missing iat/exp.');
+  } else {
+    // A 60s skew allowance both ways: clocks differ, and an envelope rejected
+    // for being two seconds early is a support ticket, not an attack.
+    if (claims.exp < now - 60) reasons.push('Envelope has expired.');
+    if (claims.iat > now + 60) reasons.push('Envelope is issued in the future.');
+    if (now - claims.iat > maxAgeSeconds + 60) reasons.push(`Envelope is older than ${maxAgeSeconds}s.`);
+  }
+
+  return reasons.length > 0 ? { ok: false, reasons } : { ok: true, claims };
+}
+
+export const hashPayload = payload =>
+  createHash('sha256').update(JSON.stringify(payload ?? null)).digest('base64url');

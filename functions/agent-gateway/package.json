@@ -1,0 +1,17 @@
+{
+  "name": "agenthire-agent-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test/attack-battery.mjs"
+  },
+  "dependencies": {
+    "@google-cloud/cloud-sql-connector": "^1.8.0",
+    "pg": "^8.13.0",
+    "pg-copy-streams": "^6.0.6"
+  }
+}

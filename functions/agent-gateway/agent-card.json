@@ -1,0 +1,30 @@
+{
+  "name": "agent://v1.employer.agenthire.biz",
+  "display_name": "agentHire Employer Agent",
+  "version": "1.0.0",
+  "endpoint": "https://agenthire.biz/a2a/apply",
+  "capabilities": ["job_application.receive"],
+  "authentication": {
+    "scheme": "agenthire-signed-jws",
+    "typ": "agenthire-a2a+jws",
+    "alg": "ES256",
+    "request_body": "{\"jws\": \"<compact JWS>\", \"trust\": {<five scored dimensions>}}",
+    "key": "sender's registered identity key; the SPKI fingerprint must match the one pinned in a2a_agents",
+    "required_claims": ["iss", "aud", "jti", "iat", "exp"],
+    "audience": "agent://v1.employer.agenthire.biz",
+    "max_age_seconds": 120,
+    "accepted_issuer_role": "applicant"
+  },
+  "required_fields": ["full_name", "email", "resume_url"],
+  "optional_fields": ["cover_letter", "skills", "job_id"],
+  "trust_policy": {
+    "dimensions": ["integrity", "identity", "solvency", "behavior", "safety"],
+    "minimum_dimension_score": 65,
+    "minimum_average_score": 75,
+    "note": "Each dimension must carry a score and a written justification. A score without a reason is refused."
+  },
+  "privacy": {
+    "purpose": "Evaluate a candidate for a selected job opening",
+    "retention_days": 30
+  }
+}
