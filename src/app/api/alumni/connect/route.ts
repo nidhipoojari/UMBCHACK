@@ -31,5 +31,16 @@ export async function POST(request: Request) {
       : null;
 
   const result = await connectToAlumnus(claims.uid, campusId, question);
-  return Response.json(result, { status: result.ok ? 200 : 404 });
+
+  // A REFUSAL IS NOT ALWAYS A 404 ANY MORE. There are two failures now and
+  // they are different facts: an unknown campus_id is missing (404), while a
+  // student who has spent the day's energy asked for something real and was
+  // told to come back (429, with the same `error` string the body carries).
+  // Collapsing both into 404 would make "you are out of energy for today" look
+  // to a client, a log or a curl like the alumnus had ceased to exist.
+  //
+  // A duplicate is ok:true and stays a 200: nothing went wrong, it simply did
+  // not count, which the body's `counted: false` says.
+  const status = result.ok ? 200 : result.game.energy.remaining <= 0 ? 429 : 404;
+  return Response.json(result, { status });
 }
